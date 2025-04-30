@@ -6,12 +6,12 @@
   },
   "dependencies": {
     "@beatsync/shared": "workspace:*",
-    "@distube/ytdl-core": "^4.16.4",
     "hono": "^4.7.2",
     "nanoid": "^5.1.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@distube/ytdl-core": "^4.16.9",
     "@types/bun": "latest"
   }
 }

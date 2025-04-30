@@ -1,4 +1,4 @@
-import { UploadAudioType } from "@beatsync/shared";
+import { DownloadYTAudioType, UploadAudioType } from "@beatsync/shared";
 import axios from "axios";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL;
@@ -24,6 +24,23 @@ export const uploadAudioFile = async (data: UploadAudioType) => {
     if (axios.isAxiosError(error)) {
       throw new Error(
         error.response?.data?.message || "Failed to upload audio file"
+      );
+    }
+    throw error;
+  }
+};
+
+export const downloadYTAudioFile = async (data: DownloadYTAudioType) => {
+  try {
+    const response = await baseAxios.post<{
+      success: boolean;
+    }>("/upload", data);
+
+    return response.data;
+  } catch (error) {
+    if (axios.isAxiosError(error)) {
+      throw new Error(
+        error.response?.data?.message || "Failed to download audio file from yt"
       );
     }
     throw error;

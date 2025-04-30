@@ -1,4 +1,5 @@
 import { handleGetAudio } from "./routes/audio";
+import { handleYTDownload } from "./routes/download_yt";
 import { handleRoot } from "./routes/root";
 import { handleStats } from "./routes/stats";
 import { handleUpload } from "./routes/upload";
@@ -14,7 +15,7 @@ import { WSData } from "./utils/websocket";
 // Bun.serve with WebSocket support
 const server = Bun.serve<WSData, undefined>({
   hostname: "0.0.0.0",
-  port: 8080,
+  port: 3651,
   async fetch(req, server) {
     const url = new URL(req.url);
 
@@ -33,6 +34,9 @@ const server = Bun.serve<WSData, undefined>({
 
         case "/upload":
           return handleUpload(req, server);
+
+        case "/yt_download":
+          return handleYTDownload(req, server);
 
         case "/audio":
           return handleGetAudio(req, server);
