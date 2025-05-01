@@ -4,8 +4,10 @@ cd /home/bun/app
 
 
 export NEXT_PUBLIC_API_URL=$BASE_URL_API
-# Replace http(s) with ws
-export NEXT_PUBLIC_WS_URL=$(sed -r "s|https?|ws|" <<< "$BASE_URL_API/ws")
+# Use wss for https, ws for http
+NEXT_PUBLIC_WS_URL=$(sed -r "s|https|wss|" <<< "$BASE_URL_API/ws")
+export NEXT_PUBLIC_WS_URL=$(sed -r "s|http|ws|" <<< $NEXT_PUBLIC_WS_URL)
+
 
 # Extract base path & remove trailing slash
 API_PATH=$(sed -E 's~^[^/]+//[^/]+(/[^/?#][^?#]*)?.*~\1~' <<< $BASE_URL_API)

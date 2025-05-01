@@ -46,6 +46,7 @@ interface GlobalStateValues {
   selectedAudioId: string;
   uploadHistory: { name: string; timestamp: number; id: string }[];
   downloadedAudioIds: Set<string>;
+  basePath: string;
 
   // Websocket
   socket: WebSocket | null;
@@ -179,6 +180,7 @@ const initialState: GlobalStateValues = {
   connectedClients: [],
   uploadHistory: [],
   downloadedAudioIds: new Set<string>(),
+  basePath: process.env.BASE_PATH_WEB || '',
 
   // NTP state
   ntpMeasurements: [],
@@ -229,7 +231,7 @@ const loadAudioSource = async ({
   source: StaticAudioSource;
   audioContext: AudioContext;
 }) => {
-  const response = await fetch(source.url);
+  const response = await fetch(initialState.basePath + source.url);
   const arrayBuffer = await response.arrayBuffer();
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
   return {
