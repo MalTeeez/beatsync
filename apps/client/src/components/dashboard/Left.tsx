@@ -86,7 +86,6 @@ export const Left = ({ className }: LeftProps) => {
                         <li className="text-xs leading-relaxed">
                             If audio gets de-synced, pause, play / full sync and try again or refresh.
                         </li>
-                        <li className="text-xs leading-relaxed">On mobile, check silent mode is off.</li>
                         <li className="text-xs leading-relaxed">{"Play on speaker directly. Don't use Bluetooth."}</li>
                     </ul>
                 </div>
