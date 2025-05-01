@@ -5,7 +5,8 @@ import { mkdir } from "node:fs/promises";
 import * as path from "path";
 import { AUDIO_DIR } from "../config";
 import { errorResponse, jsonResponse, sendBroadcast } from "../utils/responses";
-import * as ytdl from "@distube/ytdl-core";
+import * as ytdl from '../utils/ytdl-core-bun/index.js'
+
 
 export const handleYTDownload = async (req: Request, server: Server) => {
     try {
