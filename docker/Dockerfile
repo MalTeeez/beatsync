@@ -6,8 +6,9 @@ RUN bun install
 
 ENV API_PORT=3651
 ENV WEB_PORT=3650
-ENV NEXT_PUBLIC_API_URL=http://localhost:${API_PORT}
-ENV NEXT_PUBLIC_WS_URL=ws://localhost:${API_PORT}/ws
+ENV BASE_URL=localhost
+ENV NEXT_PUBLIC_API_URL=http://${BASE_URL}:${API_PORT}
+ENV NEXT_PUBLIC_WS_URL=ws://${BASE_URL}:${API_PORT}/ws
 
 
 COPY ./docker/entrypoint.sh /

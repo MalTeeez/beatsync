@@ -18,6 +18,7 @@ https://github.com/user-attachments/assets/2aa385a7-2a07-4ab5-80b1-fda553efc57b
 
 ## Quickstart
 
+### Manually
 This project uses [Turborepo](https://turbo.build/repo).
 
 Fill in the `.env` file in `apps/client` with the following:
@@ -39,3 +40,73 @@ bun dev              # starts both client (:3000) and server (:8080)
 | `apps/server`     | Bun HTTP + WebSocket server                                    |
 | `apps/client`     | Next.js frontend with Tailwind & Shadcn/ui                     |
 | `packages/shared` | Type-safe schemas and functions shared between client & server |
+
+
+### Via Docker
+One line:
+```
+docker run -d -p 3650:3650 -p 3651:3651 --name beatsync -e BASE_URL=example.com ghcr.io/malteeez/beatsync
+```
+
+Compose:
+```
+services:
+  beatsync:
+    container_name: beatsync
+    image: ghcr.io/malteeez/beatsync:latest
+    environment:
+      - WEB_PORT=4444
+      - API_PORT=5555
+      - BASE_URL=example.com
+    ports:
+      - 4444:4444
+      - 5555:5555
+```
+
+### Via Kubernetes
+
+```
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: beatsync
+spec:
+  serviceName: "beatsync"
+  replicas: 1  # Doesn't scale currently
+  selector:
+    matchLabels:
+      app: beatsync
+  template:
+    metadata:
+      labels:
+        app: beatsync
+    spec:
+      containers:
+      - name: beatsync
+        image: ghcr.io/malteeez/beatsync:latest
+        env:
+        - name: BASE_URL
+          value: "example.com"
+        ports:
+        - containerPort: 3650
+          name: web
+        - containerPort: 3651
+          name: api
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: beatsync-service
+spec:
+  type: LoadBalancer
+  ports:
+  - name: web
+    port: 3650
+    targetPort: 3650
+  - name: api
+    port: 3651
+    targetPort: 3651
+  selector:
+    app: beatsync
+```
