@@ -36,7 +36,5 @@ jobs:
                   file: docker/Dockerfile
                   platforms: linux/amd64,linux/arm64
                   tags: |
-                      malteeez/beatsync:latest
-                      malteeez/beatsync:${{github.sha}}
                       ghcr.io/malteeez/beatsync:latest
                       ghcr.io/malteeez/beatsync:${{github.sha}}
