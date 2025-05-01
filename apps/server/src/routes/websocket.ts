@@ -1,9 +1,9 @@
-import { Server } from "bun";
 import { nanoid } from "nanoid";
 import { errorResponse } from "../utils/responses";
 import { WSData } from "../utils/websocket";
+import { server } from "..";
 
-export const handleWebSocketUpgrade = (req: Request, server: Server) => {
+export const handleWebSocketUpgrade = (req: Request) => {
   const url = new URL(req.url);
   const roomId = url.searchParams.get("roomId");
   const username = url.searchParams.get("username");

@@ -4,67 +4,49 @@ import { handleRoot } from "./routes/root";
 import { handleStats } from "./routes/stats";
 import { handleUpload } from "./routes/upload";
 import { handleWebSocketUpgrade } from "./routes/websocket";
-import {
-  handleClose,
-  handleMessage,
-  handleOpen,
-} from "./routes/websocketHandlers";
-import { corsHeaders, errorResponse } from "./utils/responses";
+import { handleClose, handleMessage, handleOpen } from "./routes/websocketHandlers";
+import { corsHeaders } from "./utils/responses";
 import { WSData } from "./utils/websocket";
 
+const api_path = process.env.API_PATH || '';
 // Bun.serve with WebSocket support
-const server = Bun.serve<WSData, undefined>({
-  hostname: "0.0.0.0",
-  port: 3651,
-  async fetch(req, server) {
-    const url = new URL(req.url);
-
-    // Handle CORS preflight requests
-    if (req.method === "OPTIONS") {
-      return new Response(null, { headers: corsHeaders });
-    }
-
-    try {
-      switch (url.pathname) {
-        case "/":
-          return handleRoot(req);
-
-        case "/ws":
-          return handleWebSocketUpgrade(req, server);
-
-        case "/upload":
-          return handleUpload(req, server);
-
-        case "/yt_download":
-          return handleYTDownload(req, server);
-
-        case "/audio":
-          return handleGetAudio(req, server);
-
-        case "/stats":
-          return handleStats(req);
-
-        default:
-          return errorResponse("Not found", 404);
-      }
-    } catch (err) {
-      return errorResponse("Internal server error", 500);
-    }
-  },
-
-  websocket: {
-    open(ws) {
-      handleOpen(ws, server);
+export const server = Bun.serve<WSData, any>({
+    hostname: "0.0.0.0",
+    port: process.env.PORT_API || 3651,
+    routes: {
+        [`${api_path}/*`]: {
+            OPTIONS: () => new Response(null, { headers: corsHeaders }),
+        },
+        [`${api_path}/`]: (req: Request) => handleRoot(req),
+        [`${api_path}/ws`]: (req: Request) => handleWebSocketUpgrade(req),
+        [`${api_path}/upload`]: {
+            POST: async (req: Request) => handleUpload(req),
+        },
+        [`${api_path}/yt_download`]: {
+            POST: async (req: Request) => handleYTDownload(req),
+        },
+        [`${api_path}/audio`]: {
+            POST: async (req: Request) => handleGetAudio(req),
+        },
+        [`${api_path}/stats`]: async (req: Request) => handleStats(req),
+    },
+    async fetch(req) {
+        return new Response("Not Found", { status: 404 });
     },
 
-    message(ws, message) {
-      handleMessage(ws, message, server);
-    },
+    websocket: {
+        open(ws) {
+            handleOpen(ws, server);
+        },
 
-    close(ws) {
-      handleClose(ws, server);
+        message(ws, message) {
+            handleMessage(ws, message, server);
+        },
+
+        close(ws) {
+            handleClose(ws, server);
+        },
     },
-  },
 });
 
 console.log(`HTTP listening on http://${server.hostname}:${server.port}`);

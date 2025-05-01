@@ -45,7 +45,7 @@ bun dev              # starts both client (:3000) and server (:8080)
 ### Via Docker
 One line:
 ```
-docker run -d -p 3650:3650 -p 3651:3651 --name beatsync -e BASE_URL=example.com ghcr.io/malteeez/beatsync
+docker run -d -p 3650:3650 -p 3651:3651 --name beatsync -e BASE_URL_API=http://example.com:3651 ghcr.io/malteeez/beatsync
 ```
 
 Compose:
@@ -55,9 +55,9 @@ services:
     container_name: beatsync
     image: ghcr.io/malteeez/beatsync:latest
     environment:
-      - WEB_PORT=4444
-      - API_PORT=5555
-      - BASE_URL=example.com
+      - PORT_WEB=4444
+      - PORT_API=5555
+      - BASE_URL_API=https://example.com/api
     ports:
       - 4444:4444
       - 5555:5555
@@ -85,8 +85,10 @@ spec:
       - name: beatsync
         image: ghcr.io/malteeez/beatsync:latest
         env:
-        - name: BASE_URL
-          value: "example.com"
+        - name: BASE_URL_API
+          value: "https://example.com/beatsync/api"
+        - name: BASE_PATH_WEB
+          value: "/beatsync"
         ports:
         - containerPort: 3650
           name: web
@@ -110,3 +112,12 @@ spec:
   selector:
     app: beatsync
 ```
+
+## env variables
+| key                 | description                                                       |
+| ------------------- | ----------------------------------------------------------------- |
+| `DISABLE_TELEMETRY` | Set to 1 to disable telemetry                                     |
+| `BASE_PATH_WEB`     | Base path for the web frontend (e.g., `/app` for example.com/app) |
+| `BASE_URL_API`      | Full URL for API endpoints (e.g., `https://example.com:3651/api`) |
+| `PORT_WEB`          | Port number for the web frontend (default: 3650)                  |
+| `PORT_API`          | Port number for the API server   (default: 3651)                  |

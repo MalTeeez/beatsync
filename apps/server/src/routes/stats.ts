@@ -7,6 +7,11 @@ import { roomManager } from "../roomManager";
 import { corsHeaders } from "../utils/responses";
 
 export async function handleStats(req: Request): Promise<Response> {
+  if (process.env.DISABLE_TELEMETRY != undefined && process.env.DISABLE_TELEMETRY === "1") {
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  console.log("Telemetry is enabled with: ", process.env.DISABLE_TELEMETRY, process.env)
   const cpus = os.cpus();
   const totalMemory = os.totalmem();
   const freeMemory = os.freemem();

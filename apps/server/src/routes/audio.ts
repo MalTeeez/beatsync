@@ -1,16 +1,10 @@
 import { GetAudioSchema } from "@beatsync/shared";
-import { Server } from "bun";
 import * as path from "path";
 import { AUDIO_DIR } from "../config";
 import { errorResponse } from "../utils/responses";
 
-export const handleGetAudio = async (req: Request, server: Server) => {
+export const handleGetAudio = async (req: Request) => {
   try {
-    // Check if it's a POST request
-    if (req.method !== "POST") {
-      return errorResponse("Method not allowed", 405);
-    }
-
     // Check content type
     const contentType = req.headers.get("content-type");
     if (!contentType || !contentType.includes("application/json")) {
