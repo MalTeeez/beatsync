@@ -17,6 +17,7 @@ import {
 import { toast } from "sonner";
 import { create } from "zustand";
 import { useRoomStore } from "./room";
+import getConfig from "next/config";
 
 export const MAX_NTP_MEASUREMENTS = 40;
 
@@ -180,7 +181,7 @@ const initialState: GlobalStateValues = {
   connectedClients: [],
   uploadHistory: [],
   downloadedAudioIds: new Set<string>(),
-  basePath: process.env.BASE_PATH_WEB || '',
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '',
 
   // NTP state
   ntpMeasurements: [],
