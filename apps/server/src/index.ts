@@ -1,6 +1,8 @@
 import { handleGetAudio } from "./routes/audio";
 import { handleYTDownload } from "./routes/download_yt";
+import { handleDownload } from "./routes/download";
 import { handleRoot } from "./routes/root";
+import { handleSearch } from "./routes/search";
 import { handleStats } from "./routes/stats";
 import { handleUpload } from "./routes/upload";
 import { handleWebSocketUpgrade } from "./routes/websocket";
@@ -24,6 +26,12 @@ export const server = Bun.serve<WSData, any>({
         },
         [`${api_path}/yt_download`]: {
             POST: async (req: Request) => handleYTDownload(req),
+        },
+        [`${api_path}/download`]: {
+            POST: async (req: Request) => handleDownload(req),
+        },
+        [`${api_path}/search`]: {
+            POST: async (req: Request) => handleSearch(req),
         },
         [`${api_path}/audio`]: {
             POST: async (req: Request) => handleGetAudio(req),

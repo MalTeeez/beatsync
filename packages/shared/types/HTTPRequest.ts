@@ -17,3 +17,10 @@ export const DownloadYTAudioSchema = z.object({
   roomId: z.string(),
 });
 export type DownloadYTAudioType = z.infer<typeof DownloadYTAudioSchema>;
+
+export const DownloadTrackSchema = z.object({
+  name: z.string(),
+  trackId: z.number(),
+  roomId: z.string(),
+});
+export type DownloadTrackType = z.infer<typeof DownloadTrackSchema>;

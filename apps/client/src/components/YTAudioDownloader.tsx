@@ -1,10 +1,12 @@
+"use client";
+
 import React, { useState } from "react";
 import { Button } from "./ui/button";
 import { Download } from "lucide-react";
 import { useRoomStore } from "@/store/room";
 import { downloadYTAudioFile } from "@/lib/api";
 
-const DownloadEdit: React.FC = () => {
+export const DownloadEdit = () => {
     const [isActive, setIsActive] = useState(false);
     const [inputValue, setInputValue] = useState(""); // Add this line
     const roomId = useRoomStore((state) => state.roomId);
@@ -67,5 +69,3 @@ const DownloadEdit: React.FC = () => {
         downloadYTAudioFile({ roomId: roomId, url: url })
     }
 };
-
-export default DownloadEdit;

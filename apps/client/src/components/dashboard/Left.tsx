@@ -1,13 +1,14 @@
 "use client";
 
 import { cn } from "@/lib/utils";
-import { Download, Library, Search } from "lucide-react";
+import { Library, Search } from "lucide-react";
 import { motion } from "motion/react";
 import { AudioUploaderMinimal } from "../AudioUploaderMinimal";
 import { Button } from "../ui/button";
 import { Separator } from "../ui/separator";
 import { AudioControls } from "./AudioControls";
-import DownloadEdit from "../YTAudioDownloader";
+import { DownloadEdit } from "../YTAudioDownloader";
+import { SearchMusic } from "./SearchMusic";
 
 interface LeftProps {
     className?: string;
