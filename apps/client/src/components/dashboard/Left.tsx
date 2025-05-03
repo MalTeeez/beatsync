@@ -91,8 +91,9 @@ export const Left = ({ className }: LeftProps) => {
                     </ul>
                 </div>
 
-                <div className="pl-1">
+                <div className="pl-1 flex flex-col space-y-2">
                     <AudioUploaderMinimal />
+                    <SearchMusic />
                 </div>
             </motion.div>
         </motion.div>

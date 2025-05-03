@@ -31,7 +31,7 @@ export const server = Bun.serve<WSData, any>({
             POST: async (req: Request) => handleDownload(req),
         },
         [`${api_path}/search`]: {
-            POST: async (req: Request) => handleSearch(req),
+            GET: async (req: Request) => handleSearch(req),
         },
         [`${api_path}/audio`]: {
             POST: async (req: Request) => handleGetAudio(req),
@@ -39,7 +39,7 @@ export const server = Bun.serve<WSData, any>({
         [`${api_path}/stats`]: async (req: Request) => handleStats(req),
     },
     async fetch(req) {
-        return new Response("Not Found", { status: 404 });
+        return new Response(`${req.url} not found with method ${req.method}.`, { status: 404 });
     },
 
     websocket: {

@@ -3,10 +3,6 @@ import { SEARCH_SERVICE } from "../download/dab";
 
 export const handleSearch = async (req: Request) => {
   try {
-    if (req.method !== "GET") {
-      return errorResponse("Method not allowed", 405);
-    }
-
     // Parse and validate the request query param
     const url = new URL(req.url);
     const query = url.searchParams.get("query");

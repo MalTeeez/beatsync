@@ -9,10 +9,6 @@
       "@beatsync/shared": ["../../packages/shared/src/index"]
     },
     "outDir": "dist",
-    "moduleResolution": "node",
-    "include": [
-      "src/**/*.ts",
-      "src/**/*.d.ts"
-    ]
+    "moduleResolution": "bundler",
   }
 }
