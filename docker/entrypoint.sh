@@ -19,5 +19,8 @@ export API_PATH=$(sed -e 's~/$~~' <<< $API_PATH)
 # sed -i 's|port: 8080|port: ${PORT_API}|' ./apps/server/src/index.ts
 # sed -i 's|"dev": "next dev"|"dev": "next dev -p ${PORT_WEB}"|' ./apps/client/package.json
 
-# Run bun (should work with builds too)
-bun run dev
+CWD=$(pwd)
+
+cd apps/client/ && bun dev &
+cd $CWD/apps/server && bun run src/index.ts &
+wait

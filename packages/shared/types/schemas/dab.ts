@@ -1,7 +1,9 @@
+import type { Track } from "../basic";
+
 /**
  * Defines a track type.
  */
-export type Track = {
+export interface DABTrack extends Track {
     id: number;
     title: string;
     artist: string;

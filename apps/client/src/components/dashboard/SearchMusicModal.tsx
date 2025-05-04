@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { Button } from "../ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Input } from "../ui/input";
-import type { Pagination, Track } from "@beatsync/shared/types/schemas/dab";
-import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "../ui/table";
+import type { Pagination, DABTrack as Track } from "@beatsync/shared/types/schemas/dab";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
 import { downloadTrack, searchTracks } from "@/lib/api";
 import {
     Download,
@@ -203,16 +203,22 @@ const ResultsTable = ({ results }: ResultsTableProps) => {
                         </TableCell>
                         <TableCell className="pr-0">
                             <div className="flex flex-col">
-                                <p className="text-[15px] font-semibold text-neutral-100 truncate max-w-56">
+                                <p
+                                    className="text-[15px] font-semibold text-neutral-100 truncate max-w-56"
+                                    title={"Title: " + track.title}
+                                >
                                     {track.title}
                                 </p>
-                                <p className="text-sm truncate max-w-56">{track.artist}</p>
+                                <p className="text-sm truncate max-w-56" title={"Artist: " + track.artist}>
+                                    {track.artist}
+                                </p>
                             </div>
                         </TableCell>
                         <TableCell className="px-0">
-                            <p className="text-[15px] truncate max-w-56">{`${
-                                track.version ? track.version + " - " : ""
-                            }${track.albumTitle}`}</p>
+                            <p
+                                className="text-[15px] truncate max-w-56"
+                                title={"Album: " + `${track.version ? track.version + " - " : ""}${track.albumTitle}`}
+                            >{`${track.version ? track.version + " - " : ""}${track.albumTitle}`}</p>
                         </TableCell>
                         <TableCell>
                             <p className="font-mono">

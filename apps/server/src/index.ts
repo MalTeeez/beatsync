@@ -1,13 +1,12 @@
 import { handleGetAudio } from "./routes/audio";
 import { handleYTDownload } from "./routes/download_yt";
 import { handleDownload } from "./routes/download";
-import { handleRoot } from "./routes/root";
 import { handleSearch } from "./routes/search";
 import { handleStats } from "./routes/stats";
 import { handleUpload } from "./routes/upload";
 import { handleWebSocketUpgrade } from "./routes/websocket";
 import { handleClose, handleMessage, handleOpen } from "./routes/websocketHandlers";
-import { corsHeaders } from "./utils/responses";
+import { corsHeaders, errorResponse } from "./utils/responses";
 import { WSData } from "./utils/websocket";
 
 const api_path = process.env.API_PATH || '';
@@ -16,10 +15,6 @@ export const server = Bun.serve<WSData, any>({
     hostname: "0.0.0.0",
     port: process.env.PORT_API || 3651,
     routes: {
-        [`${api_path}/*`]: {
-            OPTIONS: () => new Response(null, { headers: corsHeaders }),
-        },
-        [`${api_path}/`]: (req: Request) => handleRoot(req),
         [`${api_path}/ws`]: (req: Request) => handleWebSocketUpgrade(req),
         [`${api_path}/upload`]: {
             POST: async (req: Request) => handleUpload(req),
@@ -37,9 +32,14 @@ export const server = Bun.serve<WSData, any>({
             POST: async (req: Request) => handleGetAudio(req),
         },
         [`${api_path}/stats`]: async (req: Request) => handleStats(req),
+        [`${api_path}/`]: {
+            GET: () => new Response("Hello Hono!"),
+        },
     },
+    // Global catch-all (/*) is still a little buggy with methods, so we do it here
     async fetch(req) {
-        return new Response(`${req.url} not found with method ${req.method}.`, { status: 404 });
+        if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders, status: 200 });
+        return errorResponse(`${req.url} not found with method ${req.method}.`, 404);
     },
 
     websocket: {
@@ -57,4 +57,4 @@ export const server = Bun.serve<WSData, any>({
     },
 });
 
-console.log(`HTTP listening on http://${server.hostname}:${server.port}`);
+console.log(`HTTP listening on http://${server.hostname}:${server.port}${api_path}`);
