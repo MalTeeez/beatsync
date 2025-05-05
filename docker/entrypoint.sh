@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
+# Enter workdir
 cd /home/bun/app
 
+log() {
+    echo "[$(date +'%Y-%m-%d %H:%M:%S')] $1"
+}
 
 export NEXT_PUBLIC_API_URL=$BASE_URL_API
 # Use wss for https, ws for http
@@ -19,8 +24,14 @@ export API_PATH=$(sed -e 's~/$~~' <<< $API_PATH)
 # sed -i 's|port: 8080|port: ${PORT_API}|' ./apps/server/src/index.ts
 # sed -i 's|"dev": "next dev"|"dev": "next dev -p ${PORT_WEB}"|' ./apps/client/package.json
 
-CWD=$(pwd)
+# Insert variables into nginx config
+sed -i "s|\[PORT_WEB\]|$PORT_WEB|g" /etc/nginx/conf.d/beatsync.conf.template
+sed -i "s|\[BASE_PATH_WEB\]|$BASE_PATH_WEB|g" /etc/nginx/conf.d/beatsync.conf.template
+mv /etc/nginx/conf.d/beatsync.conf.template /etc/nginx/conf.d/beatsync.conf
 
-cd apps/client/ && bun dev &
-cd $CWD/apps/server && bun run src/index.ts &
-wait
+# Build nextjs static app
+cd apps/client/ && bun run next build
+mv out/* /usr/share/nginx/html/
+
+# Execute docker CMD
+exec "$@"

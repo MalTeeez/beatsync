@@ -45,7 +45,7 @@ bun dev              # starts both client (:3000) and server (:8080)
 ### Via Docker
 One line:
 ```
-docker run -d -p 3650:3650 -p 3651:3651 --name beatsync -e BASE_URL_API=http://example.com:3651 ghcr.io/malteeez/beatsync
+docker run --rm -it -p 3650:3650 -p 3651:3651 --name beatsync -e BASE_URL_API="http://localhost:3651/api" ghcr.io/malteeez/beatsync
 ```
 
 Compose:

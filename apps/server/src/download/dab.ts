@@ -10,7 +10,7 @@ import { DownloadService, SearchResult, SearchService } from "./interface";
 class DabMusicService implements SearchService, DownloadService {
   async search(query: string, offset: number): Promise<SearchResult> {
     const urlEncoded = encodeURIComponent(query);
-    console.log("Searching for ", urlEncoded)
+
     const { tracks, pagination }: { tracks: Track[], pagination: Pagination } = await fetch(
       `https://dab.yeet.su/api/search?q=${urlEncoded}&offset=${offset}&type=track`,
       {
@@ -41,6 +41,7 @@ class DabMusicService implements SearchService, DownloadService {
     name: string,
     roomId: string,
   ): Promise<string> {
+    
     const { url: streamingUrl } = (await fetch(
       `https://dab.yeet.su/api/stream?trackId=${trackId}`,
       {

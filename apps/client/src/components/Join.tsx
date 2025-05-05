@@ -71,7 +71,7 @@ export const Join = () => {
       roomId: data.roomId,
       username,
     });
-    router.push(`/room/${data.roomId}`);
+    router.push(`/room?id=${data.roomId}`);
   };
 
   const handleCreateRoom = () => {
@@ -86,7 +86,7 @@ export const Join = () => {
       username,
     });
 
-    router.push(`/room/${newRoomId}`);
+    router.push(`/room?id=${newRoomId}`);
   };
 
   const handleRegenerateName = () => {

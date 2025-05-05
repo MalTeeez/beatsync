@@ -1,0 +1,26 @@
+server {
+    include             mime.types;
+    listen              [PORT_WEB];
+    listen              [::]:[PORT_WEB];
+
+    error_log /dev/stdout info;
+    access_log /dev/stdout combined;
+
+    server_name _;
+        
+    root /usr/share/nginx/html;  # Will be filled after nextjs build
+
+    location [BASE_PATH_WEB]/ {
+        try_files $uri $uri.html $uri/ /index.html $uri/index.html;
+    }
+
+    # Enable gzip compression
+    gzip on;
+    gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
+
+    # Cache static assets
+    location [BASE_PATH_WEB]/_next/static {
+        expires 1y;
+        add_header Cache-Control "public, no-transform";
+    }
+}
