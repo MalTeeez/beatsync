@@ -22,7 +22,7 @@ server {
         #expires 1y;
         #add_header Cache-Control "public, no-transform";
 
-        try_files $uri /_next/static/$uri;
+        try_files $uri /_next/$uri;
     }
 
     # Root path, may be prefixed by BASE_PATH_NAME, usually stored as index.html
