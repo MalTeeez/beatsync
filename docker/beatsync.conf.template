@@ -10,17 +10,37 @@ server {
         
     root /usr/share/nginx/html;  # Will be filled after nextjs build
 
-    location [BASE_PATH_WEB]/ {
-        try_files $uri $uri.html $uri/ /index.html $uri/index.html;
-    }
-
     # Enable gzip compression
     gzip on;
     gzip_types text/plain text/css application/json application/javascript text/xml application/xml application/xml+rss text/javascript;
 
-    # Cache static assets
-    location [BASE_PATH_WEB]/_next/static {
-        expires 1y;
-        add_header Cache-Control "public, no-transform";
+    # Server Cache static assets
+    location ~ ^(?:[BASE_PATH_WEB])/_next/(.*)$ {
+        rewrite ^(?:[BASE_PATH_WEB])/_next/(.*)$ $1 break;
+
+        # To be set once we can ensure clean a refresh
+        #expires 1y;
+        #add_header Cache-Control "public, no-transform";
+
+        try_files $uri /_next/static/$uri;
+    }
+
+    # Root path, may be prefixed by BASE_PATH_NAME, usually stored as index.html
+    location ~ ^(?:[BASE_PATH_WEB])/?$ {
+
+        try_files $uri $uri.html index.html /$uri.html /index.html;
+    }
+
+    # Sub-Paths of BASE_PATH_NAME, i.e. room
+    location ~ ^(?:[BASE_PATH_WEB])(?:.*/)?([^/]+)/?$ {
+        rewrite ^(?:[BASE_PATH_WEB])(?:.*/)?([^/]+)/?$ /$1 break;
+
+        try_files $uri $uri.html $uri.txt;
+    }
+
+    # Direct path, usually just for icons
+    location / {
+
+        try_files $uri $uri.html =404;
     }
 }
