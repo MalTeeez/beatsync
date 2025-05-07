@@ -98,9 +98,11 @@ class DabMusicService implements SearchService, DownloadService {
       );
     }
 
-    const buffer = await audioResponse.arrayBuffer();
-    // Appearently, we have to fetch the buffer and then save, because seems that using the response directly blocks the thread
+    let buffer: ArrayBuffer | undefined = await audioResponse.arrayBuffer();
+    // Apparently, we have to fetch the buffer and then save, because seems that using the response directly blocks the thread
     await Bun.write(filePath, buffer);
+    // Force-free the buffer
+    buffer = undefined;
 
     return fileId;
   }

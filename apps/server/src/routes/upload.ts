@@ -6,6 +6,7 @@ import { errorResponse, jsonResponse, sendBroadcast } from "../utils/responses";
 import { server } from "..";
 
 export const handleUpload = async (req: Request) => {
+  let audioBuffer: Buffer | undefined; 
   try {
     // Check content type
     const contentType = req.headers.get("content-type");
@@ -41,8 +42,11 @@ export const handleUpload = async (req: Request) => {
     const filePath = path.join(AUDIO_DIR, fileId);
 
     // Decode base64 audio data and write to file using Bun.write
-    const audioBuffer = Buffer.from(audioData, "base64");
+    audioBuffer = Buffer.from(audioData, "base64");
     await Bun.write(filePath, audioBuffer);
+
+    audioBuffer.fill(0)
+    audioBuffer = undefined;
 
     sendBroadcast({
       server,
@@ -65,6 +69,12 @@ export const handleUpload = async (req: Request) => {
       success: true,
     }); // Wait for the broadcast to be received.
   } catch (error) {
+    
+    if (audioBuffer) {
+      audioBuffer.fill(0);
+      audioBuffer = undefined;
+    }
+
     console.error("Error handling upload:", error);
     return errorResponse("Failed to process upload", 500);
   }

@@ -183,9 +183,12 @@ export const handleClose = (ws: ServerWebSocket<WSData>, server: Server) => {
     `WebSocket connection closed for user ${ws.data.username} in room ${ws.data.roomId}`
   );
   ws.unsubscribe(ws.data.roomId);
+  ws.close();
 
   roomManager.removeClient(ws.data.roomId, ws.data.clientId);
 
-  const message = createClientUpdate(ws.data.roomId);
-  server.publish(ws.data.roomId, JSON.stringify(message));
+  if (roomManager.getClients(ws.data.roomId).length > 0) {
+    const message = createClientUpdate(ws.data.roomId);
+    server.publish(ws.data.roomId, JSON.stringify(message));
+  }
 };

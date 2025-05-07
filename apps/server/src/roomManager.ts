@@ -7,7 +7,7 @@ import {
 import { GRID, PositionType } from "@beatsync/shared/types/basic";
 import { Server, ServerWebSocket } from "bun";
 import { existsSync } from "node:fs";
-import { readdir } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import * as path from "path";
 import { AUDIO_DIR, SCHEDULE_TIME_MS } from "./config";
 import { calculateGainFromDistanceToSource } from "./spatial";
@@ -56,13 +56,13 @@ class RoomManager {
     if (!room) return;
 
     room.clients.delete(clientId);
-    if (room.clients.size === 0) {
+    if (room.clients.size < 1) {
       this.stopInterval(roomId);
       this.cleanupRoomFiles(roomId);
       this.rooms.delete(roomId);
+    } else {
+      positionClientsInCircle(room.clients);
     }
-
-    positionClientsInCircle(room.clients);
   }
 
   // Clean up room files when all clients have left
@@ -81,14 +81,8 @@ class RoomManager {
         );
 
         if (files.length > 0) {
-          // Delete each file in the directory
-          for (const file of files) {
-            const filePath = path.join(roomDirPath, file);
-            await Bun.file(filePath).delete();
-          }
-
-          // Remove the directory using rm -rf
-          await Bun.spawn(["rmdir", roomDirPath]).exited;
+          // Delete each file in the directory & directory itself
+          await rm(roomDirPath, { recursive: true, force: true });
 
           console.log(`Cleaned up audio files for room ${roomId}`);
         } else {

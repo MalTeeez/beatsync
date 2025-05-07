@@ -31,7 +31,8 @@ export const sendBroadcast = ({
   roomId: string;
   message: WSBroadcastType;
 }) => {
-  server.publish(roomId, JSON.stringify(message));
+  const state = server.publish(roomId, JSON.stringify(message));
+  if (state == -1) console.log("Hit backpressure for rebroadcast in room", roomId);
 };
 
 export const sendUnicast = ({

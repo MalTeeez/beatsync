@@ -2,7 +2,7 @@ import { handleGetAudio } from "./routes/audio";
 import { handleYTDownload } from "./routes/download_yt";
 import { handleDownload } from "./routes/download";
 import { handleSearch } from "./routes/search";
-import { handleStats } from "./routes/stats";
+import { handleBunStats, handleStats, handleV8Stats } from "./routes/stats";
 import { handleUpload } from "./routes/upload";
 import { handleWebSocketUpgrade } from "./routes/websocket";
 import { handleClose, handleMessage, handleOpen } from "./routes/websocketHandlers";
@@ -31,6 +31,8 @@ export const server = Bun.serve<WSData, any>({
         [`${api_path}/audio`]: {
             POST: async (req: Request) => handleGetAudio(req),
         },
+        [`${api_path}/stats_v8`]: async () => handleV8Stats(),
+        [`${api_path}/stats_bun`]: async () => handleBunStats(),
         [`${api_path}/stats`]: async (req: Request) => handleStats(req),
         [`${api_path}/`]: {
             GET: () => new Response("Hello Hono!"),
@@ -43,15 +45,19 @@ export const server = Bun.serve<WSData, any>({
     },
 
     websocket: {
-        open(ws) {
+        // Needed for bun to properly close websockets, mostly with idle timeout (https://github.com/oven-sh/bun/issues/1397)
+        sendPings: false,
+        // Close websockets that have been idle after 16 mins (max). In the future an active-clients check beforehand might be best
+        idleTimeout: 960,
+        async open(ws) {
             handleOpen(ws, server);
         },
 
-        message(ws, message) {
+        async message(ws, message) {
             handleMessage(ws, message, server);
         },
 
-        close(ws) {
+        async close(ws) {
             handleClose(ws, server);
         },
     },
