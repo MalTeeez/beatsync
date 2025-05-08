@@ -1,4 +1,4 @@
-import type { Pagination, Track } from "@beatsync/shared/types/schemas/dab"
+import type { Pagination, DABTrack as Track } from "@beatsync/shared/types/schemas/dab"
 import { AUDIO_DIR } from "../config";
 import { mkdir } from "node:fs/promises";
 import * as path from "node:path";

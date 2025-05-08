@@ -6,7 +6,7 @@ import {
 } from "@beatsync/shared";
 import { Server, ServerWebSocket } from "bun";
 import { SCHEDULE_TIME_MS } from "../config";
-import { roomManager } from "../roomManager";
+import { ROOM_MANAGER } from "../roomManager";
 import { sendBroadcast, sendUnicast } from "../utils/responses";
 import { WSData } from "../utils/websocket";
 
@@ -15,7 +15,7 @@ const createClientUpdate = (roomId: string) => {
     type: "ROOM_EVENT",
     event: {
       type: ClientActionEnum.Enum.CLIENT_CHANGE,
-      clients: roomManager.getClients(roomId),
+      clients: ROOM_MANAGER.getClients(roomId),
     },
   };
   return message;
@@ -36,7 +36,7 @@ export const handleOpen = (ws: ServerWebSocket<WSData>, server: Server) => {
   const { roomId } = ws.data;
   ws.subscribe(roomId);
 
-  roomManager.addClient(ws);
+  ROOM_MANAGER.addClient(ws);
 
   const message = createClientUpdate(roomId);
   sendBroadcast({ server, roomId, message });
@@ -93,10 +93,10 @@ export const handleMessage = async (
       parsedMessage.type === ClientActionEnum.enum.START_SPATIAL_AUDIO
     ) {
       // Start loop only if not already started
-      const room = roomManager.getRoomState(roomId);
+      const room = ROOM_MANAGER.getRoomState(roomId);
       if (!room || room.intervalId) return; // do nothing if no room or interval already exists
 
-      roomManager.startInterval({ server, roomId });
+      ROOM_MANAGER.startInterval({ server, roomId });
     } else if (
       parsedMessage.type === ClientActionEnum.enum.STOP_SPATIAL_AUDIO
     ) {
@@ -113,10 +113,10 @@ export const handleMessage = async (
       sendBroadcast({ server, roomId, message });
 
       // Stop the spatial audio interval if it exists
-      const room = roomManager.getRoomState(roomId);
+      const room = ROOM_MANAGER.getRoomState(roomId);
       if (!room || !room.intervalId) return; // do nothing if no room or no interval exists
 
-      roomManager.stopInterval(roomId);
+      ROOM_MANAGER.stopInterval(roomId);
     } else if (parsedMessage.type === ClientActionEnum.enum.REUPLOAD_AUDIO) {
       // Handle reupload request by broadcasting the audio source again
       // This will trigger clients that don't have this audio to download it
@@ -137,7 +137,7 @@ export const handleMessage = async (
       });
     } else if (parsedMessage.type === ClientActionEnum.enum.REORDER_CLIENT) {
       // Handle client reordering
-      const reorderedClients = roomManager.reorderClients({
+      const reorderedClients = ROOM_MANAGER.reorderClients({
         roomId,
         clientId: parsedMessage.clientId,
         server,
@@ -159,14 +159,14 @@ export const handleMessage = async (
       parsedMessage.type === ClientActionEnum.enum.SET_LISTENING_SOURCE
     ) {
       // Handle listening source update
-      roomManager.updateListeningSource({
+      ROOM_MANAGER.updateListeningSource({
         roomId,
         position: parsedMessage,
         server,
       });
     } else if (parsedMessage.type === ClientActionEnum.enum.MOVE_CLIENT) {
       // Handle client move
-      roomManager.moveClient({ parsedMessage, roomId, server });
+      ROOM_MANAGER.moveClient({ parsedMessage, roomId, server });
     } else {
       console.log(`UNRECOGNIZED MESSAGE: ${JSON.stringify(parsedMessage)}`);
     }
@@ -185,9 +185,9 @@ export const handleClose = (ws: ServerWebSocket<WSData>, server: Server) => {
   ws.unsubscribe(ws.data.roomId);
   ws.close();
 
-  roomManager.removeClient(ws.data.roomId, ws.data.clientId);
+  ROOM_MANAGER.removeClient(ws.data.roomId, ws.data.clientId);
 
-  if (roomManager.getClients(ws.data.roomId).length > 0) {
+  if (ROOM_MANAGER.getClients(ws.data.roomId).length > 0) {
     const message = createClientUpdate(ws.data.roomId);
     server.publish(ws.data.roomId, JSON.stringify(message));
   }

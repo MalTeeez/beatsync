@@ -2,24 +2,24 @@ import {
   ClientType,
   epochNow,
   MoveClientType,
-  WSBroadcastType,
 } from "@beatsync/shared";
 import { GRID, PositionType } from "@beatsync/shared/types/basic";
 import { Server, ServerWebSocket } from "bun";
 import { existsSync } from "node:fs";
 import { readdir, rm } from "node:fs/promises";
 import * as path from "path";
-import { AUDIO_DIR, SCHEDULE_TIME_MS } from "./config";
-import { calculateGainFromDistanceToSource } from "./spatial";
+import { AUDIO_DIR } from "./config";
+import { calculateGainFromDistanceToSource, updateSpatialAudio } from "./spatial";
 import { sendBroadcast } from "./utils/responses";
 import { debugClientPositions, positionClientsInCircle } from "./utils/spatial";
 import { WSData } from "./utils/websocket";
 
-interface RoomData {
+export interface RoomData {
   clients: Map<string, ClientType>;
   roomId: string;
   intervalId?: NodeJS.Timeout; // https://developer.mozilla.org/en-US/docs/Web/API/Window/setInterval
   listeningSource: PositionType;
+  spatialLoopCount: number;
 }
 
 class RoomManager {
@@ -33,6 +33,7 @@ class RoomManager {
         clients: new Map(),
         roomId,
         listeningSource: { x: GRID.ORIGIN_X, y: GRID.ORIGIN_Y }, // Center of the grid
+        spatialLoopCount: 0,
       });
     }
 
@@ -164,65 +165,7 @@ class RoomManager {
     const room = this.rooms.get(roomId);
     if (!room) return;
 
-    // Create a closure for the focus index that persists between startInterval calls
-    let focusIndex = 0;
-    // And one for the number of loops
-    let loopCount = 0;
-
-    const updateSpatialAudio = () => {
-      const clients = Array.from(room.clients.values()); // get most recent
-      console.log(
-        `ROOM ${roomId} LOOP ${loopCount}: Connected clients: ${clients.length}`
-      );
-      if (clients.length === 0) return;
-
-      // Calculate new position for listening source in a circle
-      // Use loopCount to determine the angle
-      const radius = 25; // Radius of the circle
-      const centerX = GRID.ORIGIN_X;
-      const centerY = GRID.ORIGIN_Y;
-      const angle = (loopCount * Math.PI) / 30; // Slow rotation, completes a circle every 60 iterations
-
-      const newX = centerX + radius * Math.cos(angle);
-      const newY = centerY + radius * Math.sin(angle);
-
-      // Update the listening source position
-      room.listeningSource = { x: newX, y: newY };
-
-      // Calculate gains for each client based on distance from listening source
-      const gains = Object.fromEntries(
-        clients.map((client) => {
-          const gain = calculateGainFromDistanceToSource({
-            client: client.position,
-            source: room.listeningSource,
-          });
-
-          return [
-            client.clientId,
-            {
-              gain,
-              rampTime: 0.25, // Use a moderate ramp time for smooth transitions
-            },
-          ];
-        })
-      );
-
-      // Send the updated configuration to all clients
-      const message: WSBroadcastType = {
-        type: "SCHEDULED_ACTION",
-        serverTimeToExecute: epochNow() + SCHEDULE_TIME_MS,
-        scheduledAction: {
-          type: "SPATIAL_CONFIG",
-          listeningSource: room.listeningSource,
-          gains,
-        },
-      };
-
-      sendBroadcast({ server, roomId, message });
-      loopCount++;
-    };
-
-    room.intervalId = setInterval(updateSpatialAudio, 100);
+    room.intervalId = setInterval(() => updateSpatialAudio(room, server), 100);
   }
 
   stopInterval(roomId: string) {
@@ -230,6 +173,7 @@ class RoomManager {
     if (!room) return;
 
     clearInterval(room.intervalId);
+    room.spatialLoopCount = 0;
     room.intervalId = undefined;
   }
 
@@ -322,4 +266,4 @@ class RoomManager {
     this._calculateGainsAndBroadcast({ room, server });
   }
 }
-export const roomManager = new RoomManager();
+export const ROOM_MANAGER = new RoomManager();

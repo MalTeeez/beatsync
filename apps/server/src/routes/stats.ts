@@ -3,7 +3,7 @@ import { readdir } from "node:fs/promises";
 import type { CpuInfo } from "os";
 import * as os from "os";
 import { AUDIO_DIR } from "../config";
-import { roomManager } from "../roomManager";
+import { ROOM_MANAGER } from "../roomManager";
 import { corsHeaders } from "../utils/responses";
 import v8 from "node:v8";
 import { generateHeapSnapshot } from "bun";
@@ -43,7 +43,7 @@ export async function handleStats(req: Request): Promise<Response> {
 
     // --- Add Room Manager Stats ---
     const roomDetails = Object.fromEntries(
-        Array.from(roomManager.rooms.entries()).map(([roomId, roomData]) => [
+        Array.from(ROOM_MANAGER.rooms.entries()).map(([roomId, roomData]) => [
             roomId,
             {
                 clientCount: roomData.clients.size,
@@ -76,7 +76,7 @@ export async function handleStats(req: Request): Promise<Response> {
     const combinedStats = {
         ...stats, // Existing CPU and Memory stats
         rooms: {
-            total: roomManager.rooms.size,
+            total: ROOM_MANAGER.rooms.size,
             details: roomDetails,
         },
         audioStorage: audioDirStats,
@@ -118,6 +118,18 @@ export async function handleBunStats(): Promise<Response> {
             ...corsHeaders,
             "Content-Type": "application/json",
             "Content-Disposition": 'attachment; filename="bun.heapsnapshot"',
+        },
+    });
+}
+
+export async function handleRoomStats(): Promise<Response> {
+    if (process.env.DISABLE_TELEMETRY != undefined && process.env.DISABLE_TELEMETRY === "1") {
+        return new Response("Forbidden", { status: 403 });
+    }
+    return new Response(JSON.stringify(Object.fromEntries(ROOM_MANAGER.rooms), null, 2), {
+        headers: {
+            ...corsHeaders,
+            "Content-Type": "application/json",
         },
     });
 }
