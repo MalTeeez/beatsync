@@ -76,7 +76,7 @@ export const TopBar = ({ roomId }: TopBarProps) => {
           {/* Add QR Code Modal button */}
           <div className="hidden md:block">|</div>
           <div className="hidden md:block">
-            <QRCodeModal roomId={roomId} />
+            <QRCodeModal/>
           </div>
         </div>
 
