@@ -48,7 +48,7 @@ export const server = Bun.serve<WSData, any>({
     websocket: {
         sendPings: true,
         // Close websockets that have been idle (not responding to pings) after 2 minutes
-        idleTimeout: 120,
+        idleTimeout: 900,
         async open(ws) {
             handleOpen(ws, server);
         },

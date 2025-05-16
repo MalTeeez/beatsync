@@ -99,6 +99,10 @@ export const WebSocketManager = ({
       sendNTPRequest();
     };
 
+    ws.onerror = (err) => {
+      console.log("Websocket onerror fired.", err)
+    }
+    
     ws.onclose = () => {
       console.log("Websocket onclose fired.");
     };
