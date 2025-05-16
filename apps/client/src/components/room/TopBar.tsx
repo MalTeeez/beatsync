@@ -4,6 +4,7 @@ import { Hash, Users } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { SyncProgress } from "../ui/SyncProgress";
+import { QRCodeModal } from "../QRCodeModal";
 
 interface TopBarProps {
   roomId: string;
@@ -35,10 +36,7 @@ export const TopBar = ({ roomId }: TopBarProps) => {
     return (
       <div className="h-8 bg-black/80 backdrop-blur-md z-50 flex items-center justify-between px-4 border-b border-zinc-800">
         <div className="flex items-center space-x-4 text-xs text-neutral-400 py-2 md:py-0">
-          <Link
-            href="/"
-            className="font-medium hover:text-white transition-colors"
-          >
+          <Link href="/" className="font-medium hover:text-white transition-colors">
             Beatsync
           </Link>
           <div className="flex items-center">
@@ -53,8 +51,7 @@ export const TopBar = ({ roomId }: TopBarProps) => {
             <Users size={12} className="mr-1" />
             <span className="flex items-center">
               <span className="mr-1.5">
-                {connectedClients.length}{" "}
-                {connectedClients.length === 1 ? "user" : "users"}
+                {connectedClients.length} {connectedClients.length === 1 ? "user" : "users"}
               </span>
             </span>
           </div>
@@ -76,6 +73,11 @@ export const TopBar = ({ roomId }: TopBarProps) => {
           >
             Full Sync
           </button>
+          {/* Add QR Code Modal button */}
+          <div className="hidden md:block">|</div>
+          <div className="hidden md:block">
+            <QRCodeModal roomId={roomId} />
+          </div>
         </div>
 
         {/* GitHub icon in the top right */}
@@ -89,15 +91,15 @@ export const TopBar = ({ roomId }: TopBarProps) => {
           <svg
             className="size-10 -rotate-45 absolute"
             viewBox="0 0 250 250"
-            style={{ 
-              color: "#a1a1a1", 
-              position: "absolute", 
-              top: 0, 
-              border: 0, 
+            style={{
+              color: "#a1a1a1",
+              position: "absolute",
+              top: 0,
+              border: 0,
               right: 0,
               stroke: "#151513", // Add outline
-              strokeWidth: "6",  // Control outline thickness
-              fill: "none"      // Remove fill
+              strokeWidth: "6", // Control outline thickness
+              fill: "none", // Remove fill
             }}
             aria-hidden="true"
           >
