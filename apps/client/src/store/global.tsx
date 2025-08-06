@@ -2,12 +2,7 @@
 import { fetchDefaultAudioSources } from "@/lib/api";
 import { getClientId } from "@/lib/clientId";
 import { extractFileNameFromUrl } from "@/lib/utils";
-import {
-  NTPMeasurement,
-  _sendNTPRequest,
-  calculateOffsetEstimate,
-  calculateWaitTimeMilliseconds,
-} from "@/utils/ntp";
+import { NTPMeasurement, _sendNTPRequest, calculateOffsetEstimate, calculateWaitTimeMilliseconds } from "@/utils/ntp";
 import { sendWSRequest } from "@/utils/ws";
 import {
   AudioSourceType,
@@ -23,6 +18,8 @@ import {
 import { Mutex } from "async-mutex";
 import { toast } from "sonner";
 import { create } from "zustand";
+import { setCookie } from "nookies";
+import { SPOTIFY_AUTHORIZE_URL, SPOTIFY_CLIENT_ID, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPES, TokenObject } from "@/lib/spotify";
 
 export const MAX_NTP_MEASUREMENTS = NTP_CONSTANTS.MAX_MEASUREMENTS;
 
@@ -46,6 +43,10 @@ interface GlobalStateValues {
   isInitingSystem: boolean;
   hasUserStartedSystem: boolean; // Track if user has clicked "Start System" at least once
   selectedAudioUrl: string;
+  
+  // Spotify
+  isSpotifySignedIn: boolean;
+  spotifySession: TokenObject | undefined;
 
   // Websocket
   socket: WebSocket | null;
@@ -100,11 +101,7 @@ interface GlobalState extends GlobalStateValues {
   setAdminStatus: (clientId: string, isAdmin: boolean) => void;
   setSelectedAudioUrl: (url: string) => boolean;
   findAudioIndexByUrl: (url: string) => number | null;
-  schedulePlay: (data: {
-    trackTimeSeconds: number;
-    targetServerTime: number;
-    audioSource: string;
-  }) => void;
+  schedulePlay: (data: { trackTimeSeconds: number; targetServerTime: number; audioSource: string }) => void;
   schedulePause: (data: { targetServerTime: number }) => void;
   setSocket: (socket: WebSocket) => void;
   broadcastPlay: (trackTimeSeconds?: number) => void;
@@ -122,11 +119,7 @@ interface GlobalState extends GlobalStateValues {
   resetNTPConfig: () => void;
   addNTPMeasurement: (measurement: NTPMeasurement) => void;
   onConnectionReset: () => void;
-  playAudio: (data: {
-    offset: number;
-    when: number;
-    audioIndex?: number;
-  }) => void;
+  playAudio: (data: { offset: number; when: number; audioIndex?: number }) => void;
   processSpatialConfig: (config: SpatialConfigType) => void;
   pauseAudio: (data: { when: number }) => void;
   getCurrentTrackPosition: () => number;
@@ -135,14 +128,11 @@ interface GlobalState extends GlobalStateValues {
   skipToPreviousTrack: () => void;
   getCurrentGainValue: () => number;
   resetStore: () => void;
-  setReconnectionInfo: (info: {
-    isReconnecting: boolean;
-    currentAttempt: number;
-    maxAttempts: number;
-  }) => void;
-  setPlaybackControlsPermissions: (
-    permissions: PlaybackControlsPermissionsType
-  ) => void;
+  setReconnectionInfo: (info: { isReconnecting: boolean; currentAttempt: number; maxAttempts: number }) => void;
+  setPlaybackControlsPermissions: (permissions: PlaybackControlsPermissionsType) => void;
+  signInToSpotify: (roomId: string) => void;
+  signOutOfSpotify: () => void;
+  setSpotifyLoggedIn: (session: TokenObject) => void;
 }
 
 // Define initial state values
@@ -150,6 +140,10 @@ const initialState: GlobalStateValues = {
   // Audio Sources
   audioSources: [],
   audioCache: new Map(),
+  
+  // Spotify
+  isSpotifySignedIn: false,
+  spotifySession: undefined,
 
   // Audio playback state
   isPlaying: false,
@@ -214,20 +208,11 @@ const getSocket = (state: GlobalState) => {
 const getWaitTimeSeconds = (state: GlobalState, targetServerTime: number) => {
   const { offsetEstimate } = state;
 
-  const waitTimeMilliseconds = calculateWaitTimeMilliseconds(
-    targetServerTime,
-    offsetEstimate
-  );
+  const waitTimeMilliseconds = calculateWaitTimeMilliseconds(targetServerTime, offsetEstimate);
   return waitTimeMilliseconds / 1000;
 };
 
-const loadAudioSourceUrl = async ({
-  url,
-  audioContext,
-}: {
-  url: string;
-  audioContext: AudioContext;
-}) => {
+const loadAudioSourceUrl = async ({ url, audioContext }: { url: string; audioContext: AudioContext }) => {
   const response = await fetch(url);
   const arrayBuffer = await response.arrayBuffer();
   const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
@@ -247,14 +232,10 @@ const initializationMutex = new Mutex();
 // Selector for canMutate
 export const useCanMutate = () => {
   const currentUser = useGlobalStore((state) => state.currentUser);
-  const playbackControlsPermissions = useGlobalStore(
-    (state) => state.playbackControlsPermissions
-  );
+  const playbackControlsPermissions = useGlobalStore((state) => state.playbackControlsPermissions);
 
   const isAdmin = currentUser?.isAdmin || false;
-  const isEveryoneMode =
-    playbackControlsPermissions ===
-    PlaybackControlsPermissionsEnum.enum.EVERYONE;
+  const isEveryoneMode = playbackControlsPermissions === PlaybackControlsPermissionsEnum.enum.EVERYONE;
   return isAdmin || isEveryoneMode;
 };
 
@@ -426,10 +407,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       if (audioIndex !== null) {
         const audioSource = state.audioSources[audioIndex];
         const audioBuffer = state.audioCache.get(audioSource.url);
-        if (!audioBuffer)
-          throw new Error(
-            `Audio buffer not decoded for url: ${audioSource.url}`
-          );
+        if (!audioBuffer) throw new Error(`Audio buffer not decoded for url: ${audioSource.url}`);
         newDuration = audioBuffer.duration;
       }
 
@@ -450,9 +428,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
     findAudioIndexByUrl: (url: string) => {
       const state = get();
       // Look through the audioSources for a matching ID
-      const index = state.audioSources.findIndex(
-        (source) => source.url === url
-      );
+      const index = state.audioSources.findIndex((source) => source.url === url);
       return index >= 0 ? index : null; // Return null if not found
     },
 
@@ -465,9 +441,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       }
 
       const waitTimeSeconds = getWaitTimeSeconds(state, data.targetServerTime);
-      console.log(
-        `Playing track ${data.audioSource} at ${data.trackTimeSeconds} seconds in ${waitTimeSeconds}`
-      );
+      console.log(`Playing track ${data.audioSource} at ${data.trackTimeSeconds} seconds in ${waitTimeSeconds}`);
 
       // Update the selected audio ID
       if (data.audioSource !== state.selectedAudioUrl) {
@@ -482,13 +456,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
           state.pauseAudio({ when: 0 });
         }
 
-        console.warn(
-          `Cannot play audio: No index found: ${data.audioSource} ${data.trackTimeSeconds}`
-        );
-        toast.warning(
-          `"${extractFileNameFromUrl(data.audioSource)}" not loaded yet...`,
-          { id: "schedulePlay" }
-        );
+        console.warn(`Cannot play audio: No index found: ${data.audioSource} ${data.trackTimeSeconds}`);
+        toast.warning(`"${extractFileNameFromUrl(data.audioSource)}" not loaded yet...`, { id: "schedulePlay" });
 
         // Resend the sync request in a couple seconds
         const { socket } = getSocket(state);
@@ -633,8 +602,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
         }
 
         // Always recalculate offset with current measurements
-        const { averageOffset, averageRoundTrip } =
-          calculateOffsetEstimate(measurements);
+        const { averageOffset, averageRoundTrip } = calculateOffsetEstimate(measurements);
 
         return {
           ntpMeasurements: measurements,
@@ -660,13 +628,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
     getCurrentTrackPosition: () => {
       const state = get();
-      const {
-        audioPlayer,
-        isPlaying,
-        currentTime,
-        playbackStartTime,
-        playbackOffset,
-      } = state; // Destructure for easier access
+      const { audioPlayer, isPlaying, currentTime, playbackStartTime, playbackOffset } = state; // Destructure for easier access
 
       if (!isPlaying || !audioPlayer) {
         return currentTime; // Return the saved position when paused or not initialized
@@ -678,11 +640,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       return Math.min(playbackOffset + elapsedSinceStart, state.duration);
     },
 
-    playAudio: async (data: {
-      offset: number;
-      when: number;
-      audioIndex?: number;
-    }) => {
+    playAudio: async (data: { offset: number; when: number; audioIndex?: number }) => {
       const state = get();
       const { sourceNode, audioContext, gainNode } = getAudioPlayer(state);
 
@@ -700,20 +658,13 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
       const startTime = audioContext.currentTime + data.when;
       const audioIndex = data.audioIndex ?? 0;
-      const audioBuffer = state.audioCache.get(
-        state.audioSources[audioIndex].url
-      );
-      if (!audioBuffer)
-        throw new Error(
-          `Audio buffer not decoded for url: ${state.audioSources[audioIndex].url}`
-        );
+      const audioBuffer = state.audioCache.get(state.audioSources[audioIndex].url);
+      if (!audioBuffer) throw new Error(`Audio buffer not decoded for url: ${state.audioSources[audioIndex].url}`);
 
       // Validate offset is within track duration to prevent sync failures
       if (data.offset >= audioBuffer.duration) {
         console.error(
-          `Sync offset ${data.offset.toFixed(
-            2
-          )}s is beyond track duration ${audioBuffer.duration.toFixed(
+          `Sync offset ${data.offset.toFixed(2)}s is beyond track duration ${audioBuffer.duration.toFixed(
             2
           )}s. Aborting playback.`
         );
@@ -728,8 +679,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       // Autoplay: Handle track ending naturally
       newSourceNode.onended = () => {
         const currentState = get();
-        const { audioPlayer: currentPlayer, isPlaying: currentlyIsPlaying } =
-          currentState; // Get fresh state
+        const { audioPlayer: currentPlayer, isPlaying: currentlyIsPlaying } = currentState; // Get fresh state
 
         // Only process if the player was 'isPlaying' right before this event fired
         // and the sourceNode that ended is the *current* sourceNode.
@@ -739,16 +689,12 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
           // Check if the buffer naturally reached its end
           // Calculate the expected end time in the AudioContext timeline
           const expectedEndTime =
-            currentState.playbackStartTime +
-            (currentState.duration - currentState.playbackOffset);
+            currentState.playbackStartTime + (currentState.duration - currentState.playbackOffset);
           // Use a tolerance for timing discrepancies (e.g., 0.5 seconds)
-          const endedNaturally =
-            Math.abs(audioContext.currentTime - expectedEndTime) < 0.5;
+          const endedNaturally = Math.abs(audioContext.currentTime - expectedEndTime) < 0.5;
 
           if (endedNaturally) {
-            console.log(
-              "Track ended naturally, skipping to next via autoplay."
-            );
+            console.log("Track ended naturally, skipping to next via autoplay.");
             // Set currentTime to duration, as playback fully completed
             // We don't set isPlaying false here, let skipToNextTrack handle state transition
             set({ currentTime: currentState.duration });
@@ -762,21 +708,12 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
             // No action needed here for non-natural ends.
           }
         } else {
-          console.log(
-            "onended fired but player was already stopped/paused or source node changed."
-          );
+          console.log("onended fired but player was already stopped/paused or source node changed.");
         }
       };
 
       newSourceNode.start(startTime, data.offset);
-      console.log(
-        "Started playback at offset:",
-        data.offset,
-        "with delay:",
-        data.when,
-        "audio index:",
-        audioIndex
-      );
+      console.log("Started playback at offset:", data.offset, "with delay:", data.when, "audio index:", audioIndex);
 
       // Update state with the new source node and tracking info
       set((state) => ({
@@ -835,12 +772,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       const elapsedSinceStart = stopTime - state.playbackStartTime;
       const currentTrackPosition = state.playbackOffset + elapsedSinceStart;
 
-      console.log(
-        "Stopping at:",
-        data.when,
-        "Current track position:",
-        currentTrackPosition
-      );
+      console.log("Stopping at:", data.when, "Current track position:", currentTrackPosition);
 
       set((state) => ({
         ...state,
@@ -859,14 +791,10 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
     setConnectedClients: (clients) => {
       const clientId = getClientId();
-      const currentUser = clients.find(
-        (client) => client.clientId === clientId
-      );
+      const currentUser = clients.find((client) => client.clientId === clientId);
 
       if (!currentUser) {
-        throw new Error(
-          `Current user not found in connected clients: ${clientId}`
-        );
+        throw new Error(`Current user not found in connected clients: ${clientId}`);
       }
 
       set({ connectedClients: clients, currentUser });
@@ -875,11 +803,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
     skipToNextTrack: (isAutoplay = false) => {
       // Accept optional isAutoplay flag
       const state = get();
-      const {
-        audioSources: audioSources,
-        selectedAudioUrl: selectedAudioId,
-        isShuffled,
-      } = state;
+      const { audioSources: audioSources, selectedAudioUrl: selectedAudioId, isShuffled } = state;
       if (audioSources.length <= 1) return; // Can't skip if only one track
 
       const currentIndex = state.findAudioIndexByUrl(selectedAudioId);
@@ -917,10 +841,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
     skipToPreviousTrack: () => {
       const state = get();
-      const {
-        audioSources,
-        selectedAudioUrl: selectedAudioId /* isShuffled */,
-      } = state; // Note: isShuffled is NOT used here currently
+      const { audioSources, selectedAudioUrl: selectedAudioId /* isShuffled */ } = state; // Note: isShuffled is NOT used here currently
       if (audioSources.length === 0) return;
 
       const currentIndex = state.findAudioIndexByUrl(selectedAudioId);
@@ -928,8 +849,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
       // Previous track always goes to the actual previous in the list, even if shuffled
       // This is a common behavior, but could be changed if needed.
-      const prevIndex =
-        (currentIndex - 1 + audioSources.length) % audioSources.length;
+      const prevIndex = (currentIndex - 1 + audioSources.length) % audioSources.length;
       const prevAudioId = audioSources[prevIndex].url;
 
       // setSelectedAudioId stops any current playback and sets isPlaying to false.
@@ -938,21 +858,16 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
       // If the track was playing before the manual skip, start playing the previous track.
       if (wasPlayingBeforeSkip) {
-        console.log(
-          `Skip to previous: ${prevAudioId}. Was playing: ${wasPlayingBeforeSkip}. Broadcasting play.`
-        );
+        console.log(`Skip to previous: ${prevAudioId}. Was playing: ${wasPlayingBeforeSkip}. Broadcasting play.`);
         state.broadcastPlay(0); // Play previous track from start
       } else {
-        console.log(
-          `Skip to previous: ${prevAudioId}. Was playing: ${wasPlayingBeforeSkip}. Not broadcasting play.`
-        );
+        console.log(`Skip to previous: ${prevAudioId}. Was playing: ${wasPlayingBeforeSkip}. Not broadcasting play.`);
       }
     },
 
     toggleShuffle: () => set((state) => ({ isShuffled: !state.isShuffled })),
 
-    setIsSpatialAudioEnabled: (isEnabled) =>
-      set({ isSpatialAudioEnabled: isEnabled }),
+    setIsSpatialAudioEnabled: (isEnabled) => set({ isSpatialAudioEnabled: isEnabled }),
 
     getCurrentGainValue: () => {
       const state = get();
@@ -979,9 +894,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       const state = get();
 
       // Find only new sources that have not already been loaded and then load them with loadAudioSourceUrl
-      const newSources = sources.filter(
-        (source) => !state.audioCache.has(source.url)
-      );
+      const newSources = sources.filter((source) => !state.audioCache.has(source.url));
 
       console.log("newSources", newSources);
 
@@ -1026,7 +939,39 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       initializeAudioExclusively();
     },
     setReconnectionInfo: (info) => set({ reconnectionInfo: info }),
-    setPlaybackControlsPermissions: (permissions) =>
-      set({ playbackControlsPermissions: permissions }),
+    setPlaybackControlsPermissions: (permissions) => set({ playbackControlsPermissions: permissions }),
+
+    signInToSpotify: (roomId: string) => {
+      const clientId = get().currentUser?.clientId;
+
+      if (clientId) {
+        const redirectParams = new URLSearchParams({
+          response_type: "code",
+          client_id: SPOTIFY_CLIENT_ID,
+          scope: SPOTIFY_SCOPES.join(" "),
+          redirect_uri: SPOTIFY_REDIRECT_URI,
+          state: `${clientId}-${roomId}`
+        });
+
+        const secure = !window.location.host.includes("localhost");
+        setCookie(undefined, "spotifyState", clientId, {
+          maxAge: 3600000,
+          secure: secure,
+          path: "/",
+        });
+  
+        const url = `${SPOTIFY_AUTHORIZE_URL}?${redirectParams.toString()}`;
+        window.location.href = url;
+  
+      }
+    },
+
+    signOutOfSpotify: () => {
+      set({ isSpotifySignedIn: false, spotifySession: undefined });
+    },
+
+    setSpotifyLoggedIn: (session: TokenObject) => {
+      set({isSpotifySignedIn: true, spotifySession: session})
+    }
   };
 });
