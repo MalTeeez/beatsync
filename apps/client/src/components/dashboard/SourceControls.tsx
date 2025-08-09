@@ -7,14 +7,15 @@ import { cn } from "@/lib/utils";
 import { FaSpotify } from "react-icons/fa";
 import { useRoomStore } from "@/store/room";
 import { useEffect } from "react";
-import { handleSpotifyOAuthCallback, TokenObject } from "@/lib/spotify";
+import { getToken, handleSpotifyOAuthCallback, TokenObject } from "@/lib/spotify";
+import { getCookie } from "@/utils/cookies";
 
 export const SourceControls = () => {
   const canMutate = useCanMutate();
   const isSpotifySignedIn = useGlobalStore((state) => state.isSpotifySignedIn);
   const signInToSpotify = useGlobalStore((state) => state.signInToSpotify);
   const signOutOfSpotify = useGlobalStore((state) => state.signOutOfSpotify);
-  const setSpotifyLoggedIn = useGlobalStore((state) => state.setSpotifyLoggedIn)
+  const setSpotifyLoggedIn = useGlobalStore((state) => state.setSpotifyLoggedIn);
   const roomId = useRoomStore((state) => state.roomId);
 
   useEffect(() => {
@@ -23,18 +24,26 @@ export const SourceControls = () => {
     if (code) {
       handleSpotifyOAuthCallback(code).then((data) => {
         const tokenData = data as TokenObject;
-        setSpotifyLoggedIn(tokenData)
+        setSpotifyLoggedIn(tokenData.access_token);
       });
-      window.history.replaceState({}, '', window.location.pathname);
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (getCookie("spotifyToken") != undefined) {
+      (async function () {
+        const access_token = await getToken();
+        if (access_token != undefined) {
+          setSpotifyLoggedIn(access_token);
+        }
+      })();
     }
-  });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSpotifySignIn = () => {
-    signInToSpotify(roomId)
+    signInToSpotify(roomId);
   };
 
   const handleSpotifySignOut = () => {
-    signOutOfSpotify()
+    signOutOfSpotify();
   };
 
   return (
@@ -45,10 +54,12 @@ export const SourceControls = () => {
       </div>
 
       <div className="space-y-2">
-        <motion.div className={cn(
-          "bg-neutral-800/20 rounded-md p-3 hover:bg-neutral-800/30 transition-colors",
-          !canMutate && "opacity-50"
-        )}>
+        <motion.div
+          className={cn(
+            "bg-neutral-800/20 rounded-md p-3 hover:bg-neutral-800/30 transition-colors",
+            !canMutate && "opacity-50"
+          )}
+        >
           <div className="flex justify-between items-center">
             <div className="text-xs text-neutral-300 flex items-center gap-1.5">
               <FaSpotify className="h-5 w-5 text-primary-500" />

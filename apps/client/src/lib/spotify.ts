@@ -123,7 +123,7 @@ export function needToRefreshToken() {
   const spotifyRefreshToken = getCookie("spotifyRefreshToken");
 
   console.log(
-    "need to refresh? " + !(token && createdAt && spotifyRefreshToken && Date.now() - Number(createdAt) < 3_000_000)
+    "Need to refresh spotify token? " + !(token && createdAt && spotifyRefreshToken && Date.now() - Number(createdAt) < 3_000_000)
   );
 
   // Need to refresh if we have no token, or if the current token is about to expire (10 minutes beforehand)
@@ -171,6 +171,5 @@ export async function getToken(): Promise<string | undefined> {
     await refreshToken();
   }
 
-  console.log("returning token ", getCookie("spotifyToken"))
   return getCookie("spotifyToken");
 }

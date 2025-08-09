@@ -1,11 +1,7 @@
 import { getToken } from "@/lib/spotify";
 import { MonitorSpeaker } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import {
-  usePlayerDevice,
-  useSpotifyPlayer,
-  useWebPlaybackSDKReady,
-} from "react-spotify-web-playback-sdk";
+import { usePlayerDevice, useSpotifyPlayer, useWebPlaybackSDKReady } from "react-spotify-web-playback-sdk";
 
 interface SpotifyDevice {
   id: string;
@@ -31,11 +27,9 @@ export const SpotifyDevice: React.FC = () => {
 
   useEffect(() => {
     if (playerDevice?.device_id === undefined || !webPlaybackSDKReady) {
-      console.log("tried to initialize, but device or sdk are uninitialized", webPlaybackSDKReady);
+      console.log("Tried to initialize spotify web session, but device or sdk are uninitialized", webPlaybackSDKReady);
       return;
     }
-
-    console.log("adding spotify device");
 
     (async function () {
       const accessToken = await getToken();
@@ -69,7 +63,11 @@ export const SpotifyDevice: React.FC = () => {
 
         // Set correct volume according to what is currently set by spotify for this client
         for (const device of data.devices) {
-          if (device.name === player?._options.name && player._options.volume != undefined && device.volume_percent !== player._options.volume * 100) {
+          if (
+            device.name === player?._options.name &&
+            player._options.volume != undefined &&
+            device.volume_percent !== player._options.volume * 100
+          ) {
             player.setVolume(device.volume_percent / 100);
           }
         }

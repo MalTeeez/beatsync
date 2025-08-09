@@ -53,7 +53,7 @@ interface GlobalStateValues {
 
   // Spotify
   isSpotifySignedIn: boolean;
-  spotifySession: TokenObject | undefined;
+  spotifySession: string | undefined;
 
   // Websocket
   socket: WebSocket | null;
@@ -139,7 +139,7 @@ interface GlobalState extends GlobalStateValues {
   setPlaybackControlsPermissions: (permissions: PlaybackControlsPermissionsType) => void;
   signInToSpotify: (roomId: string) => void;
   signOutOfSpotify: () => void;
-  setSpotifyLoggedIn: (session: TokenObject) => void;
+  setSpotifyLoggedIn: (session: string) => void;
 }
 
 // Define initial state values
@@ -980,8 +980,8 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       console.log("Spotify is now logged in? ", get().isSpotifySignedIn)
     },
     
-    setSpotifyLoggedIn: (session: TokenObject) => {
-      set({ isSpotifySignedIn: true, spotifySession: session });
+    setSpotifyLoggedIn: (sessionToken) => {
+      set({ isSpotifySignedIn: true, spotifySession: sessionToken });
       console.log("Spotify is now logged in? ", get().isSpotifySignedIn)
     },
   };
