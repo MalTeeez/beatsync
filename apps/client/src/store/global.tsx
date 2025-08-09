@@ -18,8 +18,15 @@ import {
 import { Mutex } from "async-mutex";
 import { toast } from "sonner";
 import { create } from "zustand";
-import { setCookie } from "nookies";
-import { SPOTIFY_AUTHORIZE_URL, SPOTIFY_CLIENT_ID, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPES, TokenObject } from "@/lib/spotify";
+import {
+  getChallengeCode,
+  SPOTIFY_AUTHORIZE_URL,
+  SPOTIFY_CLIENT_ID,
+  SPOTIFY_REDIRECT_URI,
+  SPOTIFY_SCOPES,
+  TokenObject,
+} from "@/lib/spotify";
+import { removeCookie, setCookie } from "@/utils/cookies";
 
 export const MAX_NTP_MEASUREMENTS = NTP_CONSTANTS.MAX_MEASUREMENTS;
 
@@ -43,7 +50,7 @@ interface GlobalStateValues {
   isInitingSystem: boolean;
   hasUserStartedSystem: boolean; // Track if user has clicked "Start System" at least once
   selectedAudioUrl: string;
-  
+
   // Spotify
   isSpotifySignedIn: boolean;
   spotifySession: TokenObject | undefined;
@@ -140,7 +147,7 @@ const initialState: GlobalStateValues = {
   // Audio Sources
   audioSources: [],
   audioCache: new Map(),
-  
+
   // Spotify
   isSpotifySignedIn: false,
   spotifySession: undefined,
@@ -941,37 +948,41 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
     setReconnectionInfo: (info) => set({ reconnectionInfo: info }),
     setPlaybackControlsPermissions: (permissions) => set({ playbackControlsPermissions: permissions }),
 
-    signInToSpotify: (roomId: string) => {
+    signInToSpotify: async (roomId: string) => {
       const clientId = get().currentUser?.clientId;
 
       if (clientId) {
+        const [codeVerifier, challengeCode] = await getChallengeCode();
+        console.log("Challenge code, secret ", challengeCode, codeVerifier)
         const redirectParams = new URLSearchParams({
           response_type: "code",
           client_id: SPOTIFY_CLIENT_ID,
           scope: SPOTIFY_SCOPES.join(" "),
           redirect_uri: SPOTIFY_REDIRECT_URI,
-          state: `${clientId}-${roomId}`
+          state: `${clientId}-${roomId}`,
+          code_challenge_method: "S256",
+          code_challenge: challengeCode,
         });
 
-        const secure = !window.location.host.includes("localhost");
-        setCookie(undefined, "spotifyState", clientId, {
-          maxAge: 3600000,
-          secure: secure,
-          path: "/",
-        });
-  
+        setCookie("spotifyChallengeSecret", codeVerifier, 3600);
+
         const url = `${SPOTIFY_AUTHORIZE_URL}?${redirectParams.toString()}`;
         window.location.href = url;
-  
       }
     },
-
+    
     signOutOfSpotify: () => {
       set({ isSpotifySignedIn: false, spotifySession: undefined });
+      removeCookie("spotifyToken");
+      removeCookie("spotifyRefreshToken");
+      removeCookie("spotifyTokenCreatedAt");
+      removeCookie("spotifyChallengeSecret");
+      console.log("Spotify is now logged in? ", get().isSpotifySignedIn)
     },
-
+    
     setSpotifyLoggedIn: (session: TokenObject) => {
-      set({isSpotifySignedIn: true, spotifySession: session})
-    }
+      set({ isSpotifySignedIn: true, spotifySession: session });
+      console.log("Spotify is now logged in? ", get().isSpotifySignedIn)
+    },
   };
 });
