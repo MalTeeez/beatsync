@@ -12,7 +12,7 @@ import {
   WSBroadcastType,
 } from "@beatsync/shared";
 import { AudioSourceSchema, GRID } from "@beatsync/shared/types/basic";
-import { SendLocationSchema } from "@beatsync/shared/types/WSRequest";
+import { ExternalPauseActionType, ExternalPlayActionType, SendLocationSchema } from "@beatsync/shared/types/WSRequest";
 import { Server, ServerWebSocket } from "bun";
 import { z } from "zod";
 import { SCHEDULE_TIME_MS } from "../config";
@@ -63,6 +63,7 @@ const RoomPlaybackStateSchema = z.object({
   audioSource: z.string(), // URL of the audio source
   serverTimeToExecute: z.number(), // When playback started/paused (server time)
   trackPositionSeconds: z.number(), // Position in track when started/paused (seconds)
+  audioProvider: z.string()
 });
 type RoomPlaybackState = z.infer<typeof RoomPlaybackStateSchema>;
 
@@ -87,6 +88,7 @@ export class RoomManager {
     audioSource: "",
     serverTimeToExecute: 0,
     trackPositionSeconds: 0,
+    audioProvider: "internal"
   };
   private playbackControlsPermissions: PlaybackControlsPermissionsType =
     "ADMIN_ONLY";
@@ -437,6 +439,7 @@ export class RoomManager {
       audioSource: pauseSchema.audioSource,
       trackPositionSeconds: pauseSchema.trackTimeSeconds,
       serverTimeToExecute: serverTimeToExecute,
+      audioProvider: "internal"
     };
   }
 
@@ -449,6 +452,35 @@ export class RoomManager {
       audioSource: playSchema.audioSource,
       trackPositionSeconds: playSchema.trackTimeSeconds,
       serverTimeToExecute: serverTimeToExecute,
+      audioProvider: "internal"
+    };
+  }
+
+  updatePlaybackScheduleExternalPause(
+    pauseSchema: ExternalPauseActionType,
+    serverTimeToExecute: number
+  ) {
+    this.playbackState = {
+      type: "paused",
+      audioSource: pauseSchema.externalTrackId,
+      // TODO: See if these are actually seconds
+      trackPositionSeconds: pauseSchema.trackTimeMillis,
+      serverTimeToExecute: serverTimeToExecute,
+      audioProvider: pauseSchema.externalProviderId
+    };
+  }
+  
+  updatePlaybackScheduleExternalPlay(
+    playSchema: ExternalPlayActionType,
+    serverTimeToExecute: number
+  ) {
+    this.playbackState = {
+      type: "playing",
+      audioSource: playSchema.externalTrackId,
+      // TODO: See if these are actually seconds
+      trackPositionSeconds: playSchema.trackTimeMillis,
+      serverTimeToExecute: serverTimeToExecute,
+      audioProvider: playSchema.externalProviderId
     };
   }
 
@@ -488,18 +520,34 @@ export class RoomManager {
         `will be at ${resumeTrackTimeSeconds.toFixed(2)}s when client starts`
     );
 
-    sendUnicast({
-      ws,
-      message: {
-        type: "SCHEDULED_ACTION",
-        scheduledAction: {
-          type: "PLAY",
-          audioSource: this.playbackState.audioSource,
-          trackTimeSeconds: resumeTrackTimeSeconds, // Use the calculated position
+    if (this.playbackState.audioProvider == "internal") {
+      sendUnicast({
+        ws,
+        message: {
+          type: "SCHEDULED_ACTION",
+          scheduledAction: {
+            type: "PLAY",
+            audioSource: this.playbackState.audioSource,
+            trackTimeSeconds: resumeTrackTimeSeconds, // Use the calculated position
+          },
+          serverTimeToExecute: serverTimeToExecute,
         },
-        serverTimeToExecute: serverTimeToExecute,
-      },
-    });
+      });
+    } else {
+      sendUnicast({
+        ws,
+        message: {
+          type: "SCHEDULED_ACTION",
+          scheduledAction: {
+            type: "EXTERNAL_PLAY",
+            externalTrackId: this.playbackState.audioSource,
+            trackTimeMillis: resumeTrackTimeSeconds,
+            externalProviderId: this.playbackState.audioProvider
+          },
+          serverTimeToExecute: serverTimeToExecute,
+        },
+      });
+    }
   }
 
   processIP({

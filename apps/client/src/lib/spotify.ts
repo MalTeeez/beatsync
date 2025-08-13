@@ -2,6 +2,7 @@ import { getCookie, removeCookie, setCookie } from "@/utils/cookies";
 
 export const SPOTIFY_AUTHORIZE_URL = "https://accounts.spotify.com/authorize";
 export const SPOTIFY_API_TOKEN_URL = "https://accounts.spotify.com/api/token";
+export const SPOTIFY_API_URL = "https://api.spotify.com/v1/";
 export const SPOTIFY_REDIRECT_URI = "http://127.0.0.1:3000/callback/spotify";
 
 export const SPOTIFY_SCOPES = [
@@ -28,6 +29,7 @@ export const SPOTIFY_SCOPES = [
 
 export const SPOTIFY_CLIENT_ID = "5a84f18bf3204f07bbf7b162bddc0c12";
 export const SPOTIFY_CLIENT_SECRET = "5986155990d5428088c33323b5ca5604";
+let SPOTIFY_SDK_PLAYER: Spotify.Player | undefined = undefined;
 
 export function base64encode(input: ArrayBuffer) {
   return btoa(String.fromCharCode(...new Uint8Array(input)))
@@ -122,9 +124,10 @@ export function needToRefreshToken() {
   const createdAt = getCookie("spotifyTokenCreatedAt");
   const spotifyRefreshToken = getCookie("spotifyRefreshToken");
 
-  console.log(
-    "Need to refresh spotify token? " + !(token && createdAt && spotifyRefreshToken && Date.now() - Number(createdAt) < 3_000_000)
-  );
+  // console.log(
+  //   "Need to refresh spotify token? " +
+  //     !(token && createdAt && spotifyRefreshToken && Date.now() - Number(createdAt) < 3_000_000)
+  // );
 
   // Need to refresh if we have no token, or if the current token is about to expire (10 minutes beforehand)
   return !(token && createdAt && spotifyRefreshToken && Date.now() - Number(createdAt) < 3_000_000);
@@ -148,7 +151,7 @@ export async function refreshToken() {
 
     if (response.ok) {
       const data = await response.json();
-      console.log("refreshed spotify token")
+      console.log("refreshed spotify token");
       setCookie("spotifyToken", data.access_token, 3600);
       setCookie("spotifyTokenCreatedAt", String(Date.now()), 3600);
 
@@ -168,8 +171,102 @@ export async function refreshToken() {
 
 export async function getToken(): Promise<string | undefined> {
   if (needToRefreshToken()) {
+    console.log("Refreshing spotify token..");
     await refreshToken();
   }
 
   return getCookie("spotifyToken");
+}
+
+/**
+ * Start playing a specific track by its id with an offset specified in milliseconds
+ * @param positionMillis
+ * @param trackId
+ * @returns The length of the now (hopefully) playing track in milliseconds
+ */
+export async function playTrack(positionMillis: number, trackId: string): Promise<number> {
+  await sendGenericPUT(
+    "me/player/play",
+    JSON.stringify({
+      uris: [trackId],
+      positionMs: positionMillis,
+    })
+  );
+
+  return new Promise(async (resolve, reject) => {
+    sendGenericGET("tracks/" + trackId.split(":").at(-1))
+      .then((res) =>
+        res && res.ok
+          ? res
+              .json()
+              .then((json) => (json != undefined && json.duration_ms ? resolve(json.duration_ms) : reject()))
+              .catch((err) => reject(err))
+          : reject()
+      )
+      .catch((err) => reject(err));
+  });
+}
+
+export async function stopPlaying() {
+  await sendGenericPUT("me/player/pause");
+}
+
+export async function sendGenericPUT(
+  endpoint: string,
+  body: URLSearchParams | string | undefined = undefined,
+  headers: object = {}
+): Promise<Response | undefined> {
+  const token = await getToken();
+  if (!token) return undefined;
+
+  const payload = {
+    method: "PUT",
+    headers: {
+      ...headers,
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: body,
+  };
+
+  endpoint = SPOTIFY_API_URL + endpoint;
+
+  return await fetch(endpoint, payload);
+}
+
+export async function sendGenericGET(endpoint: string, headers: object = {}): Promise<Response | undefined> {
+  const token = await getToken();
+  if (!token) return undefined;
+
+  const payload = {
+    method: "GET",
+    headers: {
+      ...headers,
+      Authorization: `Bearer ${token}`,
+    },
+  };
+
+  endpoint = SPOTIFY_API_URL + endpoint;
+
+  return await fetch(endpoint, payload);
+}
+
+export function setSDKPlayer(player: Spotify.Player) {
+  SPOTIFY_SDK_PLAYER = player;
+}
+
+export function getSDKPlayer(): Spotify.Player | undefined {
+  return SPOTIFY_SDK_PLAYER;
+}
+
+export async function getSDKPlaybackState(): Promise<Spotify.PlaybackState> {
+  return new Promise((resolve, reject) => {
+    if (SPOTIFY_SDK_PLAYER) {
+      SPOTIFY_SDK_PLAYER.getCurrentState()
+        .then((state) => (state != undefined ? resolve(state) : reject("Player not yet initialized")))
+        .catch((err) => reject(err));
+    } else {
+      reject("Player not yet ready.");
+    }
+  });
 }

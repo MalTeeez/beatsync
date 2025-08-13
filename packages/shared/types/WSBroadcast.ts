@@ -1,5 +1,7 @@
 import { z } from "zod";
 import {
+  ExternalPauseActionSchema,
+  ExternalPlayActionSchema,
   LocationSchema,
   PauseActionSchema,
   PlayActionSchema,
@@ -65,6 +67,8 @@ export const ScheduledActionSchema = z.object({
     PauseActionSchema,
     SpatialConfigSchema,
     StopSpatialAudioSchema,
+    ExternalPlayActionSchema,
+    ExternalPauseActionSchema,
   ]),
 });
 

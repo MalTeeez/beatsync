@@ -27,6 +27,8 @@ import {
   TokenObject,
 } from "@/lib/spotify";
 import { removeCookie, setCookie } from "@/utils/cookies";
+import { type ExternalPlayActionType } from "@beatsync/shared";
+import { AudioProviderId, providerRegistry } from "./providers";
 
 export const MAX_NTP_MEASUREMENTS = NTP_CONSTANTS.MAX_MEASUREMENTS;
 
@@ -54,6 +56,7 @@ interface GlobalStateValues {
   // Spotify
   isSpotifySignedIn: boolean;
   spotifySession: string | undefined;
+  isSpotifyReadyToPlay: boolean;
 
   // Websocket
   socket: WebSocket | null;
@@ -81,6 +84,7 @@ interface GlobalStateValues {
   currentTime: number;
   duration: number;
   volume: number;
+  playbackProvider: string;
 
   // Tracking properties
   playbackStartTime: number;
@@ -127,8 +131,8 @@ interface GlobalState extends GlobalStateValues {
   addNTPMeasurement: (measurement: NTPMeasurement) => void;
   onConnectionReset: () => void;
   playAudio: (data: { offset: number; when: number; audioIndex?: number }) => void;
-  processSpatialConfig: (config: SpatialConfigType) => void;
   pauseAudio: (data: { when: number }) => void;
+  processSpatialConfig: (config: SpatialConfigType) => void;
   getCurrentTrackPosition: () => number;
   toggleShuffle: () => void;
   skipToNextTrack: (isAutoplay?: boolean) => void;
@@ -140,6 +144,13 @@ interface GlobalState extends GlobalStateValues {
   signInToSpotify: (roomId: string) => void;
   signOutOfSpotify: () => void;
   setSpotifyLoggedIn: (session: string) => void;
+  scheduleExternalPlay: (targetServerTime: number, data: ExternalPlayActionType) => void;
+  scheduleExternalPause: (data: { targetServerTime: number }) => void;
+  setSpotifyReadyToPlayState: (state: boolean) => void;
+  // playExternalAudio: (data: { offset: number; when: number; externalTrackId: string, externalProviderId: string }) => void;
+  // pauseExternalAudio: (data: { when: number }) => void;
+  setPlaybackProvider: (providerId: AudioProviderId) => void,
+
 }
 
 // Define initial state values
@@ -151,6 +162,7 @@ const initialState: GlobalStateValues = {
   // Spotify
   isSpotifySignedIn: false,
   spotifySession: undefined,
+  isSpotifyReadyToPlay: false,
 
   // Audio playback state
   isPlaying: false,
@@ -158,6 +170,7 @@ const initialState: GlobalStateValues = {
   playbackStartTime: 0,
   playbackOffset: 0,
   selectedAudioUrl: "",
+  playbackProvider: "internal" as AudioProviderId,
 
   // Spatial audio
   isShuffled: false,
@@ -196,7 +209,7 @@ const initialState: GlobalStateValues = {
   playbackControlsPermissions: PlaybackControlsPermissionsEnum.enum.EVERYONE,
 };
 
-const getAudioPlayer = (state: GlobalState) => {
+export const getAudioPlayer = (state: GlobalState) => {
   if (!state.audioPlayer) {
     throw new Error(AudioPlayerError.NotInitialized);
   }
@@ -735,6 +748,26 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
         duration: audioBuffer.duration, // Set the duration
       }));
     },
+    
+    pauseAudio: (data: { when: number }) => {
+      const state = get();
+      const { sourceNode, audioContext } = getAudioPlayer(state);
+
+      const stopTime = audioContext.currentTime + data.when;
+      sourceNode.stop(stopTime);
+
+      // Calculate current position in the track at the time of pausing
+      const elapsedSinceStart = stopTime - state.playbackStartTime;
+      const currentTrackPosition = state.playbackOffset + elapsedSinceStart;
+
+      console.log("Stopping at:", data.when, "Current track position:", currentTrackPosition);
+
+      set((state) => ({
+        ...state,
+        isPlaying: false,
+        currentTime: currentTrackPosition,
+      }));
+    },
 
     processSpatialConfig: (config: SpatialConfigType) => {
       const state = get();
@@ -766,26 +799,6 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
 
       // Ramp time is set server side
       gainNode.gain.linearRampToValueAtTime(gain, now + rampTime);
-    },
-
-    pauseAudio: (data: { when: number }) => {
-      const state = get();
-      const { sourceNode, audioContext } = getAudioPlayer(state);
-
-      const stopTime = audioContext.currentTime + data.when;
-      sourceNode.stop(stopTime);
-
-      // Calculate current position in the track at the time of pausing
-      const elapsedSinceStart = stopTime - state.playbackStartTime;
-      const currentTrackPosition = state.playbackOffset + elapsedSinceStart;
-
-      console.log("Stopping at:", data.when, "Current track position:", currentTrackPosition);
-
-      set((state) => ({
-        ...state,
-        isPlaying: false,
-        currentTime: currentTrackPosition,
-      }));
     },
 
     setListeningSourcePosition: (position: PositionType) => {
@@ -885,6 +898,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
     getAudioDuration: ({ url }) => {
       const state = get();
       const audioBuffer = state.audioCache.get(url);
+      console.log("Getting audio duration")
       if (!audioBuffer) {
         console.error(`Audio buffer not decoded for url: ${url}`);
         return 0;
@@ -972,7 +986,7 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
     },
     
     signOutOfSpotify: () => {
-      set({ isSpotifySignedIn: false, spotifySession: undefined });
+      set({ isSpotifySignedIn: false, spotifySession: undefined, isSpotifyReadyToPlay: false });
       removeCookie("spotifyToken");
       removeCookie("spotifyRefreshToken");
       removeCookie("spotifyTokenCreatedAt");
@@ -984,5 +998,173 @@ export const useGlobalStore = create<GlobalState>((set, get) => {
       set({ isSpotifySignedIn: true, spotifySession: sessionToken });
       console.log("Spotify is now logged in? ", get().isSpotifySignedIn)
     },
+
+    scheduleExternalPlay: (targetServerTime: number, data: ExternalPlayActionType) => {
+      const state = get();
+      if (state.isInitingSystem) {
+        console.log("Not playing audio, still loading");
+        return;
+      }
+
+      const providerId = data.externalProviderId as AudioProviderId;
+      set({ playbackProvider: providerId });
+
+      const provider = providerRegistry[providerId];
+      if (!provider || !provider.isReady()) {
+        // Pause current track to prevent interference
+        if (state.isPlaying) {
+          state.pauseAudio({ when: 0 });
+        }
+        toast.warning(`Provider ${providerId} is not ready`);
+        return;
+      }
+
+      const waitTimeSeconds = getWaitTimeSeconds(state, targetServerTime);
+      console.log(`Playing track ${data.externalTrackId} at ${(data.trackTimeMillis / 1000).toFixed(2)} seconds in ${waitTimeSeconds} via provider ${data.externalProviderId}`);
+
+      // Update the selected audio provider
+      if (providerId !== state.playbackProvider) {
+        set({ playbackProvider: providerId });
+      }
+
+      // Update the selected audio ID
+      if (data.externalTrackId !== state.selectedAudioUrl) {
+        set({ selectedAudioUrl: data.externalTrackId });
+      }
+
+      provider.play(
+        data,
+        getWaitTimeSeconds(state, targetServerTime)
+      );
+    },
+
+    scheduleExternalPause: ({ targetServerTime }: { targetServerTime: number }) => {
+      const state = get();
+      const provider = providerRegistry[state.playbackProvider as AudioProviderId];
+      if (!provider || !provider.isReady()) {
+        toast.warning(`Provider ${state.playbackProvider} is not ready`);
+        return;
+      }
+      provider.pause(
+        getWaitTimeSeconds(state, targetServerTime),
+      );
+    },
+
+    setSpotifyReadyToPlayState: (state: boolean) => {
+      set({isSpotifyReadyToPlay: state})
+    },
+
+    // playExternalAudio: async (data: { offset: number; when: number; externalTrackId: string, externalProviderId: string }) => {
+    //   const state = get();
+    //   const { sourceNode, audioContext, gainNode } = getAudioPlayer(state);
+
+    //   // Before any audio playback, ensure the context is running
+    //   if (audioContext.state !== "running") {
+    //     console.log("AudioContext still suspended, aborting play");
+    //     toast.error("Audio context is suspended. Please try again.");
+    //     return;
+    //   }
+
+    //   // Stop any existing source node before creating a new one
+    //   try {
+    //     sourceNode.stop();
+    //   } catch (_) {}
+
+    //   const startTime = audioContext.currentTime + data.when;
+    //   const audioIndex = data.audioIndex ?? 0;
+    //   const audioBuffer = state.audioCache.get(state.audioSources[audioIndex].url);
+    //   if (!audioBuffer) throw new Error(`Audio buffer not decoded for url: ${state.audioSources[audioIndex].url}`);
+
+    //   // Validate offset is within track duration to prevent sync failures
+    //   if (data.offset >= audioBuffer.duration) {
+    //     console.error(
+    //       `Sync offset ${data.offset.toFixed(2)}s is beyond track duration ${audioBuffer.duration.toFixed(
+    //         2
+    //       )}s. Aborting playback.`
+    //     );
+    //     return;
+    //   }
+
+    //   // Create a new source node
+    //   const newSourceNode = audioContext.createBufferSource();
+    //   newSourceNode.buffer = audioBuffer;
+    //   newSourceNode.connect(gainNode);
+
+    //   // Autoplay: Handle track ending naturally
+    //   newSourceNode.onended = () => {
+    //     const currentState = get();
+    //     const { audioPlayer: currentPlayer, isPlaying: currentlyIsPlaying } = currentState; // Get fresh state
+
+    //     // Only process if the player was 'isPlaying' right before this event fired
+    //     // and the sourceNode that ended is the *current* sourceNode.
+    //     // This prevents handlers from old nodes interfering after a quick skip.
+    //     if (currentlyIsPlaying && currentPlayer?.sourceNode === newSourceNode) {
+    //       const { audioContext } = currentPlayer;
+    //       // Check if the buffer naturally reached its end
+    //       // Calculate the expected end time in the AudioContext timeline
+    //       const expectedEndTime =
+    //         currentState.playbackStartTime + (currentState.duration - currentState.playbackOffset);
+    //       // Use a tolerance for timing discrepancies (e.g., 0.5 seconds)
+    //       const endedNaturally = Math.abs(audioContext.currentTime - expectedEndTime) < 0.5;
+
+    //       if (endedNaturally) {
+    //         console.log("Track ended naturally, skipping to next via autoplay.");
+    //         // Set currentTime to duration, as playback fully completed
+    //         // We don't set isPlaying false here, let skipToNextTrack handle state transition
+    //         set({ currentTime: currentState.duration });
+    //         currentState.skipToNextTrack(true); // Trigger autoplay skip
+    //       } else {
+    //         console.log(
+    //           "onended fired but not deemed a natural end (likely manual stop/skip). State should be handled elsewhere."
+    //         );
+    //         // If stopped manually (pauseAudio) or skipped (setSelectedAudioId),
+    //         // those functions are responsible for setting isPlaying = false and currentTime.
+    //         // No action needed here for non-natural ends.
+    //       }
+    //     } else {
+    //       console.log("onended fired but player was already stopped/paused or source node changed.");
+    //     }
+    //   };
+
+    //   newSourceNode.start(startTime, data.offset);
+    //   console.log("Started playback at offset:", data.offset, "with delay:", data.when, "audio index:", audioIndex);
+
+    //   // Update state with the new source node and tracking info
+    //   set((state) => ({
+    //     ...state,
+    //     audioPlayer: {
+    //       ...state.audioPlayer!,
+    //       sourceNode: newSourceNode,
+    //     },
+    //     isPlaying: true,
+    //     playbackStartTime: startTime,
+    //     playbackOffset: data.offset,
+    //     duration: audioBuffer.duration, // Set the duration
+    //   }));
+    // },
+    
+    // pauseExternalAudio: (data: { when: number }) => {
+    //   const state = get();
+    //   const { sourceNode, audioContext } = getAudioPlayer(state);
+
+    //   const stopTime = audioContext.currentTime + data.when;
+    //   sourceNode.stop(stopTime);
+
+    //   // Calculate current position in the track at the time of pausing
+    //   const elapsedSinceStart = stopTime - state.playbackStartTime;
+    //   const currentTrackPosition = state.playbackOffset + elapsedSinceStart;
+
+    //   console.log("Stopping at:", data.when, "Current track position:", currentTrackPosition);
+
+    //   set((state) => ({
+    //     ...state,
+    //     isPlaying: false,
+    //     currentTime: currentTrackPosition,
+    //   }));
+    // },
+
+    setPlaybackProvider: (providerId: AudioProviderId) => {
+      set({ playbackProvider: providerId })
+    }
   };
 });

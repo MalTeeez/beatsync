@@ -1,4 +1,5 @@
-import { getToken } from "@/lib/spotify";
+import { getToken, sendGenericGET, sendGenericPUT } from "@/lib/spotify";
+import { useGlobalStore } from "@/store/global";
 import { MonitorSpeaker } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { usePlayerDevice, useSpotifyPlayer, useWebPlaybackSDKReady } from "react-spotify-web-playback-sdk";
@@ -18,6 +19,7 @@ interface DevicesResponse {
 }
 
 export const SpotifyDevice: React.FC = () => {
+  const setSpotifyReadyToPlay = useGlobalStore((state) => state.setSpotifyReadyToPlayState);
   const player = useSpotifyPlayer();
   const playerDevice = usePlayerDevice();
   const webPlaybackSDKReady = useWebPlaybackSDKReady();
@@ -35,30 +37,23 @@ export const SpotifyDevice: React.FC = () => {
       const accessToken = await getToken();
       if (!accessToken) return;
       // https://developer.spotify.com/documentation/web-api/reference/#endpoint-transfer-a-users-playback
-      await fetch(`https://api.spotify.com/v1/me/player`, {
-        method: "PUT",
-        body: JSON.stringify({ device_ids: [playerDevice.device_id], play: true }),
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-    })();
-  }, [playerDevice?.device_id, webPlaybackSDKReady]);
+      const device_register = await sendGenericPUT(
+        "me/player",
+        JSON.stringify({ device_ids: [playerDevice.device_id], play: true })
+      );
 
+      if (device_register?.ok) {
+        setSpotifyReadyToPlay(true);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [playerDevice?.device_id, webPlaybackSDKReady]);
   const fetchDevices = async () => {
     setLoading(true);
     try {
-      const accessToken = await getToken();
-      if (!accessToken) return;
+      const response = await sendGenericGET("me/player/devices");
 
-      const response = await fetch(`https://api.spotify.com/v1/me/player/devices`, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      if (response.ok) {
+      if (response?.ok) {
         const data: DevicesResponse = await response.json();
 
         // Set correct volume according to what is currently set by spotify for this client
@@ -89,17 +84,7 @@ export const SpotifyDevice: React.FC = () => {
 
   const switchToDevice = async (deviceId: string) => {
     try {
-      const accessToken = await getToken();
-      if (!accessToken) return;
-
-      await fetch(`https://api.spotify.com/v1/me/player`, {
-        method: "PUT",
-        body: JSON.stringify({ device_ids: [deviceId], play: true }),
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      await sendGenericPUT("me/player", JSON.stringify({ device_ids: [deviceId], play: true }));
 
       // Refresh devices list
       fetchDevices();

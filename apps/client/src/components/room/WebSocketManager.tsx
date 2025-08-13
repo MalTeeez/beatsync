@@ -7,12 +7,7 @@ import { useGlobalStore } from "@/store/global";
 import { useRoomStore } from "@/store/room";
 import { NTPMeasurement } from "@/utils/ntp";
 import { sendWSRequest } from "@/utils/ws";
-import {
-  ClientActionEnum,
-  epochNow,
-  NTPResponseMessageType,
-  WSResponseSchema,
-} from "@beatsync/shared";
+import { ClientActionEnum, epochNow, NTPResponseMessageType, WSResponseSchema } from "@beatsync/shared";
 import { useEffect } from "react";
 
 // Helper function for NTP response handling
@@ -43,10 +38,7 @@ interface WebSocketManagerProps {
 }
 
 // No longer need the props interface
-export const WebSocketManager = ({
-  roomId,
-  username,
-}: WebSocketManagerProps) => {
+export const WebSocketManager = ({ roomId, username }: WebSocketManagerProps) => {
   // Get PostHog client ID
   const { clientId } = useClientId();
 
@@ -58,39 +50,26 @@ export const WebSocketManager = ({
   const socket = useGlobalStore((state) => state.socket);
   const schedulePlay = useGlobalStore((state) => state.schedulePlay);
   const schedulePause = useGlobalStore((state) => state.schedulePause);
-  const processSpatialConfig = useGlobalStore(
-    (state) => state.processSpatialConfig
-  );
+  const processSpatialConfig = useGlobalStore((state) => state.processSpatialConfig);
   const addNTPMeasurement = useGlobalStore((state) => state.addNTPMeasurement);
-  const setConnectedClients = useGlobalStore(
-    (state) => state.setConnectedClients
-  );
-  const isSpatialAudioEnabled = useGlobalStore(
-    (state) => state.isSpatialAudioEnabled
-  );
-  const setIsSpatialAudioEnabled = useGlobalStore(
-    (state) => state.setIsSpatialAudioEnabled
-  );
-  const processStopSpatialAudio = useGlobalStore(
-    (state) => state.processStopSpatialAudio
-  );
-  const handleSetAudioSources = useGlobalStore(
-    (state) => state.handleSetAudioSources
-  );
-  const setPlaybackControlsPermissions = useGlobalStore(
-    (state) => state.setPlaybackControlsPermissions
-  );
-
+  const setConnectedClients = useGlobalStore((state) => state.setConnectedClients);
+  const isSpatialAudioEnabled = useGlobalStore((state) => state.isSpatialAudioEnabled);
+  const setIsSpatialAudioEnabled = useGlobalStore((state) => state.setIsSpatialAudioEnabled);
+  const processStopSpatialAudio = useGlobalStore((state) => state.processStopSpatialAudio);
+  const handleSetAudioSources = useGlobalStore((state) => state.handleSetAudioSources);
+  const setPlaybackControlsPermissions = useGlobalStore((state) => state.setPlaybackControlsPermissions);
+  const scheduleExternalPlay = useGlobalStore((state) => state.scheduleExternalPlay);
+  const scheduleExternalPause = useGlobalStore((state) => state.scheduleExternalPause);
+  
   // Use the NTP heartbeat hook
-  const { startHeartbeat, stopHeartbeat, markNTPResponseReceived } =
-    useNtpHeartbeat({
-      onConnectionStale: () => {
-        const currentSocket = useGlobalStore.getState().socket;
-        if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
-          currentSocket.close();
-        }
-      },
-    });
+  const { startHeartbeat, stopHeartbeat, markNTPResponseReceived } = useNtpHeartbeat({
+    onConnectionStale: () => {
+      const currentSocket = useGlobalStore.getState().socket;
+      if (currentSocket && currentSocket.readyState === WebSocket.OPEN) {
+        currentSocket.close();
+      }
+    },
+  });
 
   // Use the WebSocket reconnection hook
   const {
@@ -205,6 +184,10 @@ export const WebSocketManager = ({
           }
         } else if (scheduledAction.type === "STOP_SPATIAL_AUDIO") {
           processStopSpatialAudio();
+        } else if (scheduledAction.type === ClientActionEnum.Enum.EXTERNAL_PLAY) {
+          scheduleExternalPlay(serverTimeToExecute, scheduledAction);
+        } else if (scheduledAction.type === ClientActionEnum.Enum.EXTERNAL_PAUSE) {
+          scheduleExternalPause(serverTimeToExecute);
         }
       } else {
         console.log("Unknown response type:", response);

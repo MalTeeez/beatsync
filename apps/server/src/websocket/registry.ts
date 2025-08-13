@@ -11,7 +11,9 @@ import { handleSetListeningSource } from "./handlers/setListeningSource";
 import { handleStartSpatialAudio } from "./handlers/startSpatialAudio";
 import { handleStopSpatialAudio } from "./handlers/stopSpatialAudio";
 import { handleSync } from "./handlers/sync";
-import { WebsocketRegistry } from "./types";
+import { handleExternalPause } from "./handlers/handleExternalPause";
+import { handleExternalPlay } from "./handlers/handleExternalPlay";
+import { type WebsocketRegistry } from "./types";
 
 export const WS_REGISTRY: WebsocketRegistry = {
   [ClientActionEnum.enum.NTP_REQUEST]: {
@@ -71,5 +73,14 @@ export const WS_REGISTRY: WebsocketRegistry = {
   [ClientActionEnum.enum.SEND_IP]: {
     handle: handleSendIp,
     description: "Send IP to server",
+  },
+
+  [ClientActionEnum.enum.EXTERNAL_PLAY]: {
+    handle: handleExternalPlay,
+    description: "Schedule play action for external playback",
+  },
+  [ClientActionEnum.enum.EXTERNAL_PAUSE]: {
+    handle: handleExternalPause,
+    description: "Schedule pause action for external playback",
   },
 };

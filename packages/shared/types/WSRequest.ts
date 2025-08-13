@@ -23,7 +23,9 @@ export const ClientActionEnum = z.enum([
   "SYNC", // Client joins late, requests sync
   "SET_ADMIN", // Set admin status
   "SET_PLAYBACK_CONTROLS", // Set playback controls
-  "SEND_IP", // Send IP to server
+  "SEND_IP", // Send IP to server,
+  "EXTERNAL_PLAY",
+  "EXTERNAL_PAUSE"
 ]);
 
 export const NTPRequestPacketSchema = z.object({
@@ -99,6 +101,21 @@ export const SendLocationSchema = z.object({
   location: LocationSchema,
 });
 
+export const ExternalPlayActionSchema = z.object({
+  type: z.literal(ClientActionEnum.enum.EXTERNAL_PLAY),
+  externalProviderId: z.string(),
+  trackTimeMillis: z.number(),
+  externalTrackId: z.string(),
+});
+
+export const ExternalPauseActionSchema = z.object({
+  type: z.literal(ClientActionEnum.enum.EXTERNAL_PAUSE),
+  externalProviderId: z.string(),
+  trackTimeMillis: z.number(),
+  externalTrackId: z.string(),
+});
+
+
 export const WSRequestSchema = z.discriminatedUnion("type", [
   PlayActionSchema,
   PauseActionSchema,
@@ -112,10 +129,14 @@ export const WSRequestSchema = z.discriminatedUnion("type", [
   SetAdminSchema,
   SetPlaybackControlsSchema,
   SendLocationSchema,
+  ExternalPlayActionSchema,
+  ExternalPauseActionSchema
 ]);
 export type WSRequestType = z.infer<typeof WSRequestSchema>;
 export type PlayActionType = z.infer<typeof PlayActionSchema>;
 export type PauseActionType = z.infer<typeof PauseActionSchema>;
+export type ExternalPlayActionType = z.infer<typeof ExternalPlayActionSchema>;
+export type ExternalPauseActionType = z.infer<typeof ExternalPauseActionSchema>;
 export type ReorderClientType = z.infer<typeof ReorderClientSchema>;
 export type SetListeningSourceType = z.infer<typeof SetListeningSourceSchema>;
 

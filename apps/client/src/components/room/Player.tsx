@@ -22,6 +22,7 @@ export const Player = () => {
   const getCurrentTrackPosition = useGlobalStore(
     (state) => state.getCurrentTrackPosition
   );
+  const currentTrackProgressFallback = useGlobalStore((state) => state.duration);
   const selectedAudioId = useGlobalStore((state) => state.selectedAudioUrl);
   const audioSources = useGlobalStore((state) => state.audioSources);
   const currentTime = useGlobalStore((state) => state.currentTime);
@@ -50,8 +51,11 @@ export const Player = () => {
       setTrackDuration(getAudioDuration({ url: audioSource.url }));
       // Reset slider position when track changes
       setSliderPosition(0);
+    } else {
+      setTrackDuration(currentTrackProgressFallback);
+      setSliderPosition(0);
     }
-  }, [selectedAudioId, audioSources, getAudioDuration]);
+  }, [selectedAudioId, audioSources, getAudioDuration, currentTrackProgressFallback]);
 
   // Sync with currentTime when it changes (e.g., after pausing)
   useEffect(() => {
